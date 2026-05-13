@@ -1,0 +1,166 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:yuri_reader/modules/library/providers/library_state_provider.dart';
+import 'package:yuri_reader/models/manga.dart';
+import 'package:yuri_reader/modules/library/widgets/continue_reader_button.dart';
+import 'package:yuri_reader/modules/manga/detail/providers/state_providers.dart';
+import 'package:yuri_reader/utils/extensions/build_context_extensions.dart';
+import 'package:yuri_reader/modules/library/widgets/library_entry_utils.dart';
+import 'package:yuri_reader/modules/widgets/bottom_text_widget.dart';
+import 'package:yuri_reader/modules/widgets/cover_view_widget.dart';
+import 'package:yuri_reader/modules/widgets/gridview_widget.dart';
+
+class LibraryGridViewWidget extends StatefulWidget {
+  final bool isCoverOnlyGrid;
+  final bool isComfortableGrid;
+  final Set<int> mangaIdsList;
+  final List<Manga> entriesManga;
+  final bool language;
+  final bool downloadedChapter;
+  final bool continueReaderBtn;
+  final bool localSource;
+  final ItemType itemType;
+  const LibraryGridViewWidget({
+    super.key,
+    required this.entriesManga,
+    required this.isCoverOnlyGrid,
+    this.isComfortableGrid = false,
+    required this.language,
+    required this.downloadedChapter,
+    required this.continueReaderBtn,
+    required this.mangaIdsList,
+    required this.localSource,
+    required this.itemType,
+  });
+
+  @override
+  State<LibraryGridViewWidget> createState() => _LibraryGridViewWidgetState();
+}
+
+class _LibraryGridViewWidgetState extends State<LibraryGridViewWidget> {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, child) {
+        final isLongPressed = ref.watch(isLongPressedStateProvider);
+        final gridSize = ref.watch(
+          libraryGridSizeStateProvider(itemType: widget.itemType),
+        );
+        return GridViewWidget(
+          gridSize: gridSize,
+          childAspectRatio: widget.isComfortableGrid ? 0.642 : 0.69,
+          itemCount: widget.entriesManga.length,
+          itemBuilder: (context, index) {
+            final entry = widget.entriesManga[index];
+            final isLocalArchive = entry.isLocalArchive ?? false;
+
+            return Padding(
+              padding: const EdgeInsets.all(2),
+              child: CoverViewWidget(
+                isLongPressed: widget.mangaIdsList.contains(entry.id),
+                isComfortableGrid: widget.isComfortableGrid,
+                bottomTextWidget: BottomTextWidget(
+                  maxLines: 1,
+                  text: entry.name!,
+                  isComfortableGrid: widget.isComfortableGrid,
+                ),
+                image: resolveCoverImage(entry, ref),
+                onTap: () => onTapEntry(
+                  isLongPressed: isLongPressed,
+                  ref: ref,
+                  context: context,
+                  entry: entry,
+                ),
+                onLongPress: () =>
+                    handleLongOrSecondaryTap(isLongPressed, ref, entry),
+                onSecondaryTap: () =>
+                    handleLongOrSecondaryTap(isLongPressed, ref, entry),
+                children: [
+                  Stack(
+                    children: [
+                      // ── Top-left: Local + download count + unread count ──
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        child: Padding(
+                          padding: const EdgeInsets.all(5),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(3),
+                              color: context.primaryColor,
+                            ),
+                            child: Row(
+                              children: [
+                                if (widget.localSource && isLocalArchive)
+                                  const EntryBadgeChip(label: 'Local'),
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 5),
+                                  child: Row(
+                                    children: [
+                                      if (widget.downloadedChapter)
+                                        DownloadCountBadge(entry: entry),
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 3),
+                                        child: Text(
+                                          entry.chapters
+                                              .where((e) => !e.isRead!)
+                                              .length
+                                              .toString(),
+                                          style: TextStyle(
+                                            color:
+                                                context.dynamicBlackWhiteColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // ── Top-right: Language ──
+                      if (widget.language && entry.lang!.isNotEmpty)
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: Padding(
+                            padding: const EdgeInsets.all(5),
+                            child: Container(
+                              color: context.themeData.cardColor,
+                              child: EntryBadgeChip(
+                                label: entry.lang!.toUpperCase(),
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(3),
+                                  bottomLeft: Radius.circular(3),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+
+                  if (!widget.isComfortableGrid && !widget.isCoverOnlyGrid)
+                    BottomTextWidget(text: entry.name!),
+
+                  if (widget.continueReaderBtn)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Padding(
+                        padding: const EdgeInsets.all(9),
+                        child: ContinueReaderButton(entry: entry),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
