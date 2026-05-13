@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:yuri_reader/utils/language.dart';
 
-class ExtensionLangListTileWidget extends StatelessWidget {
+class ExtensionLangListTileWidget extends StatefulWidget {
   final String lang;
   final bool value;
   final Function(bool) onChanged;
@@ -13,17 +13,41 @@ class ExtensionLangListTileWidget extends StatelessWidget {
   });
 
   @override
+  State<ExtensionLangListTileWidget> createState() =>
+      _ExtensionLangListTileWidgetState();
+}
+
+class _ExtensionLangListTileWidgetState
+    extends State<ExtensionLangListTileWidget> {
+  late bool _value;
+
+  @override
+  void initState() {
+    super.initState();
+    _value = widget.value;
+  }
+
+  @override
+  void didUpdateWidget(covariant ExtensionLangListTileWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) {
+      _value = widget.value;
+    }
+  }
+
+  void _handleChange(bool val) {
+    setState(() => _value = val);
+    widget.onChanged(val);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ListTile(
-      onTap: () {
-        onChanged(!value);
-      },
-      title: Text(completeLanguageName(lang.toLowerCase())),
+      onTap: () => _handleChange(!_value),
+      title: Text(completeLanguageName(widget.lang.toLowerCase())),
       trailing: Switch(
-        value: value,
-        onChanged: (value) {
-          onChanged(value);
-        },
+        value: _value,
+        onChanged: _handleChange,
       ),
     );
   }
