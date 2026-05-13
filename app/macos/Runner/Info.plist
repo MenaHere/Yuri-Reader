@@ -8,9 +8,9 @@
 		<true/>
 	</dict>
 	<key>NSDocumentUsageDescription</key>
-	<string>Mangayomi needs access to your files to create and restore backups.</string>
+	<string>YuriReader needs access to your files to create and restore backups.</string>
 	<key>NSDownloadsFolderUsageDescription</key>
-	<string>Mangayomi needs access to Downloads folder to save backups.</string>
+	<string>YuriReader needs access to Downloads folder to save backups.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleExecutable</key>
@@ -41,10 +41,10 @@
 	<array>
     	<dict>
         	<key>CFBundleURLName</key>
-        	<string>mangayomi</string>
+        	<string>yurireader</string>
         	<key>CFBundleURLSchemes</key>
         	<array>
-            	<string>mangayomi</string>
+            	<string>yurireader</string>
         	</array>
     	</dict>
 	</array>

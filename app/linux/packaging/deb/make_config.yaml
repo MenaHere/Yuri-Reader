@@ -1,6 +1,6 @@
-display_name: Mangayomi
+display_name: YuriReader
 
-package_name: mangayomi
+package_name: yurireader
 
 maintainer:
   name: kodjodevf
@@ -19,10 +19,10 @@ depencencies:
 essential: false
 
 postinstall_scripts:
-  - echo "Installed Mangayomi successfully"
+  - echo "Installed YuriReader successfully"
   
 postuninstall_scripts:
-  - echo "Uninstalled Mangayomi successfully"
+  - echo "Uninstalled YuriReader successfully"
 icon: assets/app_icons/icon-red.png
 
 keywords:
