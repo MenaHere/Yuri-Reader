@@ -1,0 +1,861 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.status = exports.rateLimitExclude = exports.syncRegex = void 0;
+exports.urlPart = urlPart;
+exports.urlStrip = urlStrip;
+exports.urlParam = urlParam;
+exports.getBaseText = getBaseText;
+exports.favicon = favicon;
+exports.watching = watching;
+exports.planTo = planTo;
+exports.episode = episode;
+exports.getselect = getselect;
+exports.absoluteLink = absoluteLink;
+exports.parseHtml = parseHtml;
+exports.urlChangeDetect = urlChangeDetect;
+exports.fullUrlChangeDetect = fullUrlChangeDetect;
+exports.changeDetect = changeDetect;
+exports.waitUntilTrue = waitUntilTrue;
+exports.getAsyncWaitUntilTrue = getAsyncWaitUntilTrue;
+exports.checkDoubleExecution = checkDoubleExecution;
+exports.getUrlFromTags = getUrlFromTags;
+exports.setUrlInTags = setUrlInTags;
+exports.setResumeWaching = setResumeWaching;
+exports.getResumeWaching = getResumeWaching;
+exports.setContinueWaching = setContinueWaching;
+exports.getContinueWaching = getContinueWaching;
+exports.setEntrySettings = setEntrySettings;
+exports.getEntrySettings = getEntrySettings;
+exports.handleMalImages = handleMalImages;
+exports.getTooltip = getTooltip;
+exports.timeDiffToText = timeDiffToText;
+exports.canHideTabs = canHideTabs;
+exports.statusTag = statusTag;
+exports.getStatusText = getStatusText;
+exports.notifications = notifications;
+exports.timeCache = timeCache;
+exports.flashm = flashm;
+exports.flashConfirm = flashConfirm;
+exports.lazyload = lazyload;
+exports.elementInViewport = elementInViewport;
+exports.wait = wait;
+exports.pageUrl = pageUrl;
+exports.returnYYYYMMDD = returnYYYYMMDD;
+exports.htmlDecode = htmlDecode;
+exports.isFirefox = isFirefox;
+exports.waitForPageToBeVisible = waitForPageToBeVisible;
+exports.clearCache = clearCache;
+exports.sortAlphabetically = sortAlphabetically;
+exports.isDomainMatching = isDomainMatching;
+exports.upperCaseFirstLetter = upperCaseFirstLetter;
+function urlPart(url, part) {
+    if (!url)
+        return '';
+    const urlParts = url.split('/');
+    if (!urlParts[part])
+        return '';
+    return urlParts[part].replace(/[#?].*/, '');
+}
+function urlStrip(url) {
+    return url.replace(/[#?].*/, '');
+}
+function urlParam(url, name) {
+    const results = new RegExp(`[?&]${name}=([^&#]*)`).exec(url);
+    if (results === null) {
+        return null;
+    }
+    return decodeURI(results[1]) || 0;
+}
+function getBaseText(element) {
+    return element
+        .contents()
+        .filter(function () {
+        return this.nodeType === Node.TEXT_NODE;
+    })
+        .text();
+}
+function favicon(domain) {
+    if (!domain)
+        return '';
+    const res = domain.match(/^(https?:\/\/)?[^/]+/);
+    if (res)
+        domain = res[0];
+    return `https://favicon.malsync.moe/?domain=${domain}`;
+}
+function watching(type) {
+    if (type === 'manga')
+        return 'Reading';
+    return 'Watching';
+}
+function planTo(type) {
+    if (type === 'manga')
+        return 'Plan to Read';
+    return 'Plan to Watch';
+}
+function episode(type) {
+    if (type === 'manga')
+        return api.storage.lang('UI_Chapter');
+    return api.storage.lang('UI_Episode');
+}
+exports.syncRegex = /(^settings\/.*|^updateCheckTime$|^tempVersion$|^local:\/\/|^list-tagSettings$)/;
+exports.rateLimitExclude = /^https:\/\/api.malsync.moe\/(shark|mal\/|nc\/mal\/.*\/progress$)/i;
+// eslint-disable-next-line no-shadow
+var status;
+(function (status) {
+    // eslint-disable-next-line no-shadow
+    status[status["watching"] = 1] = "watching";
+    status[status["completed"] = 2] = "completed";
+    status[status["onhold"] = 3] = "onhold";
+    status[status["dropped"] = 4] = "dropped";
+    status[status["planToWatch"] = 6] = "planToWatch";
+})(status || (exports.status = status = {}));
+function getselect(data, name) {
+    let temp = data.split(`name="${name}"`)[1].split('</select>')[0];
+    if (temp.indexOf('selected="selected"') > -1) {
+        temp = temp.split('<option');
+        for (let i = 0; i < temp.length; ++i) {
+            if (temp[i].indexOf('selected="selected"') > -1) {
+                return temp[i].split('value="')[1].split('"')[0];
+            }
+        }
+    }
+    return '';
+}
+function absoluteLink(url, domain) {
+    if (typeof url === 'undefined') {
+        return url;
+    }
+    if (!url.startsWith('http')) {
+        if (url.charAt(0) !== '/')
+            url = `/${url}`;
+        url = domain + url;
+    }
+    return url;
+}
+function parseHtml(text) {
+    const parser = new DOMParser();
+    const dom = parser.parseFromString(`<!doctype html><body>${text}`, 'text/html');
+    return dom.body.textContent;
+}
+function urlChangeDetect(callback) {
+    let currentPage = window.location.href;
+    return setInterval(function () {
+        if (currentPage !== window.location.href) {
+            currentPage = window.location.href;
+            callback();
+        }
+    }, 100);
+}
+function fullUrlChangeDetect(callback, strip = false) {
+    let currentPage = '';
+    const intervalId = setInterval(function () {
+        const url = strip ? urlStrip(window.location.href) : window.location.href;
+        if (currentPage !== url) {
+            currentPage = url;
+            callback();
+        }
+    }, 100);
+    return Number(intervalId);
+}
+function changeDetect(callback, func, immediate = false) {
+    let currentPage = func();
+    const intervalId = setInterval(function () {
+        const temp = func();
+        if (typeof temp !== 'undefined' && currentPage !== temp) {
+            currentPage = func();
+            callback();
+        }
+    }, 500);
+    if (immediate)
+        callback();
+    return Number(intervalId);
+}
+function waitUntilTrue(condition, callback, interval = 200) {
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    const intervalId = setInterval(async function () {
+        let state = false;
+        try {
+            const conditionState = condition();
+            if (conditionState && conditionState instanceof Promise) {
+                state = await conditionState;
+            }
+            else {
+                state = conditionState;
+            }
+        }
+        catch (e) {
+            con.info('Error in waitUntilTrue', e);
+        }
+        if (state) {
+            clearInterval(intervalId);
+            callback();
+        }
+    }, interval);
+    return intervalId;
+}
+function getAsyncWaitUntilTrue(condition, interval = 100) {
+    let intervalId;
+    let rejectThis;
+    const reset = () => {
+        clearTimeout(intervalId);
+        if (rejectThis)
+            rejectThis('AsyncWait stopped');
+    };
+    return {
+        asyncWaitUntilTrue: () => {
+            reset();
+            return new Promise((resolve, reject) => {
+                rejectThis = reject;
+                intervalId = waitUntilTrue(condition, () => resolve(), interval);
+            });
+        },
+        reset,
+    };
+}
+const doubleId = Math.random();
+function checkDoubleExecution() {
+    if ($('.mal-sync-double-detect').length) {
+        $('.mal-sync-double-detect').each(function (index) {
+            if ($(this).text() !== doubleId.toString()) {
+                alert('Double execution detected! Please run MAL-Sync once only.');
+            }
+        });
+    }
+    $('body').after(j.html(`<div class="mal-sync-double-detect" style="display: none;">${doubleId.toString()}</div>`));
+}
+function getUrlFromTags(tags) {
+    if (/malSync::[\d\D]+::/.test(tags)) {
+        return atobURL(tags.split('malSync::')[1].split('::')[0]);
+    }
+    if (/last::[\d\D]+::/.test(tags)) {
+        return atobURL(tags.split('last::')[1].split('::')[0]);
+    }
+    return undefined;
+    function atobURL(encoded) {
+        try {
+            return atob(encoded);
+        }
+        catch (e) {
+            return encoded;
+        }
+    }
+}
+function setUrlInTags(url, tags) {
+    if (url === '') {
+        tags = tags.replace(/,?(malSync|last)::[^ \n]+?::/, '');
+        return tags;
+    }
+    if (!api.settings.get('malTags'))
+        return tags;
+    const addition = `malSync::${btoa(url)}::`;
+    if (/(last|malSync)::[\d\D]+::/.test(tags)) {
+        tags = tags.replace(/(last|malSync)::[^^]*?::/, addition);
+    }
+    else {
+        tags = `${tags},${addition}`;
+    }
+    return tags;
+}
+async function setResumeWaching(url, ep, type, id) {
+    return api.storage.set(`resume/${type}/${id}`, { url, ep });
+}
+async function getResumeWaching(type, id) {
+    if (!api.settings.get('malResume'))
+        return;
+    /* eslint-disable-next-line consistent-return */
+    return api.storage.get(`resume/${type}/${id}`);
+}
+async function setContinueWaching(url, ep, type, id) {
+    return api.storage.set(`continue/${type}/${id}`, { url, ep });
+}
+async function getContinueWaching(type, id) {
+    if (!api.settings.get('malContinue'))
+        return;
+    /* eslint-disable-next-line consistent-return */
+    return api.storage.get(`continue/${type}/${id}`);
+}
+async function setEntrySettings(type, id, options, tags = '') {
+    const tempOptions = {};
+    if (options) {
+        for (const key in options) {
+            switch (key) {
+                case 'u':
+                case 'p':
+                    tempOptions[key] = options[key];
+                    break;
+                default:
+            }
+        }
+        if (api.settings.get('malTags')) {
+            // TAG mode
+            tags = setUrlInTags(JSON.stringify(tempOptions), tags);
+        }
+        else {
+            // No TAG mode
+            await api.storage.set(`tagSettings/${type}/${id}`, JSON.stringify(tempOptions));
+        }
+    }
+    if (!Object.values(tempOptions).find(el => Boolean(el))) {
+        tags = setUrlInTags('', tags);
+        if (!api.settings.get('malTags')) {
+            await api.storage.remove(`tagSettings/${type}/${id}`);
+        }
+    }
+    return tags;
+}
+async function getEntrySettings(type, id, tags = '') {
+    const tempOptions = {
+        u: null, // url
+        c: null, // Continue Url
+        r: null, // Resume Url
+        p: '', // Progress Mode
+    };
+    if (api.settings.get('malTags')) {
+        // TAG mode
+        const tagString = getUrlFromTags(tags);
+        if (tagString) {
+            if (tagString[0] === '{') {
+                try {
+                    const temp = JSON.parse(tagString);
+                    for (const key in tempOptions) {
+                        if (temp[key])
+                            tempOptions[key] = temp[key];
+                    }
+                }
+                catch (e) {
+                    con.error(e);
+                }
+            }
+            else {
+                tempOptions.u = tagString;
+            }
+        }
+    }
+    else {
+        // No TAG mode
+        let temp = await api.storage.get(`tagSettings/${type}/${id}`);
+        if (temp) {
+            temp = JSON.parse(temp);
+            for (const key in tempOptions) {
+                if (temp[key])
+                    tempOptions[key] = temp[key];
+            }
+        }
+    }
+    const continueUrlObj = await getContinueWaching(type, id);
+    if (continueUrlObj)
+        tempOptions.c = continueUrlObj;
+    const resumeUrlObj = await getResumeWaching(type, id);
+    if (resumeUrlObj)
+        tempOptions.r = resumeUrlObj;
+    if (!api.settings.get('usedPage'))
+        tempOptions.u = null;
+    return tempOptions;
+}
+function handleMalImages(url) {
+    if (url.indexOf('questionmark') !== -1)
+        return api.storage.assetUrl('questionmark.gif');
+    return url;
+}
+function getTooltip(text, style = '', direction = 'top') {
+    const rNumber = Math.floor(Math.random() * 1000 + 1);
+    return `<div id="tt${rNumber}" class="icon material-icons" style="font-size:16px; line-height: 0; color: #7f7f7f; padding-bottom: 20px; padding-left: 3px; ${style}">contact_support</div>\
+  <div class="mdl-tooltip mdl-tooltip--${direction} mdl-tooltip--large" for="tt${rNumber}">${text}</div>`;
+}
+function timeDiffToText(delta) {
+    let text = '';
+    delta /= 1000;
+    const diffYears = Math.floor(delta / 31536000);
+    delta -= diffYears * 31536000;
+    if (diffYears) {
+        text += `${diffYears}y `;
+    }
+    const diffDays = Math.floor(delta / 86400);
+    delta -= diffDays * 86400;
+    if (diffDays) {
+        text += `${diffDays}d `;
+    }
+    const diffHours = Math.floor(delta / 3600) % 24;
+    delta -= diffHours * 3600;
+    if (diffHours && diffDays < 2) {
+        text += `${diffHours}h `;
+    }
+    const diffMinutes = Math.floor(delta / 60) % 60;
+    delta -= diffMinutes * 60;
+    if (diffMinutes && !diffDays && diffHours < 3) {
+        text += `${diffMinutes}min `;
+    }
+    return text;
+}
+function canHideTabs() {
+    if (typeof browser !== 'undefined' && typeof browser.tabs.hide !== 'undefined') {
+        return true;
+    }
+    return false;
+}
+// eslint-disable-next-line no-shadow
+function statusTag(status, type, id) {
+    const info = {
+        anime: {
+            1: {
+                class: 'watching',
+                text: 'CW',
+                title: api.storage.lang(`UI_Status_watching_${type}`),
+            },
+            2: {
+                class: 'completed',
+                text: 'CMPL',
+                title: api.storage.lang('UI_Status_Completed'),
+            },
+            3: {
+                class: 'on-hold',
+                text: 'HOLD',
+                title: api.storage.lang('UI_Status_OnHold'),
+            },
+            4: {
+                class: 'dropped',
+                text: 'DROP',
+                title: api.storage.lang('UI_Status_Dropped'),
+            },
+            6: {
+                class: 'plantowatch',
+                text: 'PTW',
+                title: api.storage.lang(`UI_Status_planTo_${type}`),
+            },
+            23: {
+                class: 'rewatching',
+                text: 'RE',
+                title: api.storage.lang(`UI_Status_Rewatching_${type}`),
+            },
+        },
+        manga: {
+            1: {
+                class: 'reading',
+                text: 'CR',
+                title: api.storage.lang(`UI_Status_watching_${type}`),
+            },
+            2: {
+                class: 'completed',
+                text: 'CMPL',
+                title: api.storage.lang('UI_Status_Completed'),
+            },
+            3: {
+                class: 'on-hold',
+                text: 'HOLD',
+                title: api.storage.lang('UI_Status_OnHold'),
+            },
+            4: {
+                class: 'dropped',
+                text: 'DROP',
+                title: api.storage.lang('UI_Status_Dropped'),
+            },
+            6: {
+                class: 'plantoread',
+                text: 'PTR',
+                title: api.storage.lang(`UI_Status_planTo_${type}`),
+            },
+            23: {
+                class: 'rewatching',
+                text: 'RE',
+                title: api.storage.lang(`UI_Status_Rewatching_${type}`),
+            },
+        },
+    };
+    $.each([1, 2, 3, 4, 6, 23], function (i, el) {
+        info.anime[info.anime[el].title] = info.anime[el];
+        info.manga[info.manga[el].title] = info.manga[el];
+    });
+    if (status && info[type][status]) {
+        const tempInfo = info[type][status];
+        return ` <a href="https://myanimelist.net/ownlist/${type}/${id}/edit?hideLayout=1" title="${tempInfo.title}" class="Lightbox_AddEdit button_edit ${tempInfo.class}">${tempInfo.text}</a>`;
+    }
+    return false;
+}
+function getStatusText(type, state) {
+    switch (state) {
+        case 1:
+            return api.storage.lang(`UI_Status_watching_${type}`);
+        case 2:
+            return api.storage.lang('UI_Status_Completed');
+        case 3:
+            return api.storage.lang('UI_Status_OnHold');
+        case 4:
+            return api.storage.lang('UI_Status_Dropped');
+        case 6:
+            return api.storage.lang(`UI_Status_planTo_${type}`);
+        case 7:
+            return api.storage.lang('UI_Status_All');
+        case 23:
+            return api.storage.lang(`UI_Status_Rewatching_${type}`);
+        case 24:
+            return api.storage.lang('UI_Status_Considering');
+        default:
+            return '';
+    }
+}
+// eslint-disable-next-line consistent-return
+function notifications(url, title, message, iconUrl = '') {
+    const messageObj = {
+        type: 'basic',
+        title,
+        message,
+        iconUrl,
+    };
+    con.log('Notification', url, messageObj);
+    api.storage.get('notificationHistory').then(history => {
+        if (history === undefined) {
+            history = [];
+        }
+        if (typeof history !== 'object')
+            return;
+        if (history.length >= 10) {
+            history.shift();
+        }
+        history.push({
+            url,
+            title: messageObj.title,
+            message: messageObj.message,
+            iconUrl: messageObj.iconUrl,
+            timestamp: Date.now(),
+        });
+        api.storage.set('notificationHistory', history);
+    });
+    try {
+        return chrome.notifications.create(url, messageObj);
+    }
+    catch (e) {
+        con.error(e);
+    }
+}
+async function timeCache(key, dataFunction, ttl) {
+    const value = await api.storage.get(key);
+    if (typeof value === 'object' && new Date().getTime() < value.timestamp) {
+        return value.data;
+    }
+    const result = await dataFunction();
+    return api.storage.set(key, { data: result, timestamp: new Date().getTime() + ttl }).then(() => {
+        return result;
+    });
+}
+// flashm
+function flashm(text, options) {
+    if (!j.$('#flash-div-top').length) {
+        initflashm();
+    }
+    con.log('[Flash] Message:', text);
+    let colorF = '#323232';
+    if (typeof options !== 'undefined' && typeof options.error !== 'undefined' && options.error) {
+        colorF = '#3e0808';
+    }
+    let flashdiv = '#flash-div-bottom';
+    if (typeof options !== 'undefined' &&
+        typeof options.position !== 'undefined' &&
+        options.position) {
+        flashdiv = `#flash-div-${options.position}`;
+    }
+    let messClass = 'flash';
+    if (typeof options !== 'undefined' && typeof options.type !== 'undefined' && options.type) {
+        const tempClass = `type-${options.type}`;
+        j.$(`${flashdiv} .${tempClass}, #flashinfo-div .${tempClass}`)
+            .removeClass(tempClass)
+            .fadeOut({
+            duration: 1000,
+            queue: false,
+            complete() {
+                j.$(this).remove();
+            },
+        });
+        messClass += ` ${tempClass}`;
+    }
+    let mess = `<div class="${messClass}" style="display:none;">\
+        <div style="display:table; pointer-events: all; padding: 14px 24px 14px 24px; margin: 0 auto; margin-top: 5px; max-width: 60%; -webkit-border-radius: 20px;-moz-border-radius: 20px;border-radius: 2px;color: white;background:${colorF}; ">\
+          ${text}\
+        </div>\
+      </div>`;
+    let flashmEl;
+    if (typeof options !== 'undefined' &&
+        typeof options.hoverInfo !== 'undefined' &&
+        options.hoverInfo) {
+        messClass += ' flashinfo';
+        mess = `<div class="${messClass}" style="display:none; max-height: 5000px; overflow: hidden;"><div style="display:table; pointer-events: all; margin: 0 auto; margin-top: -2px; max-width: 60%; -webkit-border-radius: 20px;-moz-border-radius: 20px;border-radius: 2px;color: white;background:${colorF}; position: relative;"><div style="max-height: 60vh; overflow-y: auto; padding: 14px 24px 14px 24px;">${text}</div></div></div>`;
+        j.$('#flashinfo-div').addClass('hover');
+        // eslint-disable-next-line jquery-unsafe-malsync/no-xss-jquery
+        flashmEl = j.$(j.html(mess)).appendTo('#flashinfo-div');
+        if (typeof options !== 'undefined' &&
+            typeof options.minimized !== 'undefined' &&
+            options.minimized)
+            flashmEl.css('max-height', '8px');
+    }
+    else {
+        // eslint-disable-next-line jquery-unsafe-malsync/no-xss-jquery
+        flashmEl = j.$(j.html(mess)).appendTo(flashdiv);
+    }
+    if (typeof options !== 'undefined' &&
+        typeof options.permanent !== 'undefined' &&
+        options.permanent) {
+        flashmEl.slideDown(800);
+    }
+    else if (typeof options !== 'undefined' &&
+        typeof options.hoverInfo !== 'undefined' &&
+        options.hoverInfo) {
+        flashmEl
+            .slideDown(800)
+            .delay(4000)
+            .queue(function () {
+            j.$('#flashinfo-div').removeClass('hover');
+            flashmEl.css('max-height', '8px');
+        });
+    }
+    else {
+        flashmEl
+            .slideDown(800)
+            .delay(4000)
+            .slideUp(800, () => {
+            // @ts-ignore
+            j.$(this).remove();
+        });
+    }
+    return flashmEl;
+}
+async function flashConfirm(message, type, yesCall = () => {
+    /* Placeholder */
+}, cancelCall = () => {
+    /* Placeholder */
+}, yesNo = false) {
+    return new Promise(function (resolve, reject) {
+        let yesText = api.storage.lang('Ok');
+        let noText = api.storage.lang('Cancel');
+        if (yesNo) {
+            yesText = api.storage.lang('Yes');
+            noText = api.storage.lang('No');
+        }
+        message = `<div style="text-align: center;">${message}</div><div style="display: flex; justify-content: space-around;"><button class="Yes" style="background-color: transparent; border: none; color: rgb(255,64,129);margin-top: 10px; cursor:pointer;">${yesText}</button><button class="Cancel" style="background-color: transparent; border: none; color: rgb(255,64,129);margin-top: 10px; cursor:pointer;">${noText}</button></div>`;
+        const flasmessage = flashm(message, {
+            permanent: true,
+            position: 'top',
+            type,
+        });
+        flasmessage.find('.Yes').click(function (evt) {
+            resolve(true);
+            j.$(evt.target)
+                .parentsUntil('.flash')
+                .fadeOut(300, function () {
+                // @ts-ignore
+                j.$(this).remove();
+            });
+            yesCall();
+        });
+        flasmessage.find('.Cancel').click(function (evt) {
+            resolve(false);
+            j.$(evt.target)
+                .parentsUntil('.flash')
+                .fadeOut(300, function () {
+                // @ts-ignore
+                j.$(this).remove();
+            });
+            cancelCall();
+        });
+    });
+}
+function initflashm() {
+    api.storage.addStyle(`.flashinfo{
+                    transition: max-height 2s, opacity 2s 2s;
+                 }
+                 .mini-stealth .flashinfo{
+                    opacity: 0;
+                 }
+                  #flashinfo-div.hover.mini-stealth .flashinfo.type-update{
+                    opacity: 0.7;
+                 }
+                 #flashinfo-div.hover .flashinfo{
+                    opacity: 1;
+                 }
+                 .flashinfo:hover, .flashinfo.open{
+                    max-height:5000px !important;
+                    z-index: 2147483647;
+                    opacity: 1;
+                    transition: max-height 2s;
+                 }
+                 .flashinfo .synopsis{
+                    transition: max-height 2s, max-width 2s ease 2s;
+                 }
+                 .flashinfo:hover .synopsis, .flashinfo.open .synopsis{
+                    max-height:9999px !important;
+                    max-width: 500px !important;
+                    transition: max-height 2s;
+                 }
+                 #flashinfo-div{
+                  z-index: 2;
+                  transition: 2s;
+                 }
+                 #flashinfo-div:hover, #flashinfo-div.hover{
+                  z-index: 2147483647;
+                 }
+
+                 #flash-div-top, #flash-div-bottom, #flashinfo-div{
+                    font-family: "Helvetica","Arial",sans-serif;
+                    color: white;
+                    font-size: 14px;
+                    font-weight: 400;
+                    line-height: 17px;
+                 }
+                 #flash-div-top h2, #flash-div-bottom h2, #flashinfo-div h2{
+                    font-family: "Helvetica","Arial",sans-serif;
+                    color: white;
+                    font-size: 14px;
+                    font-weight: 700;
+                    line-height: 17px;
+                    padding: 0;
+                    margin: 0;
+                 }
+                 #flash-div-top a, #flash-div-bottom a, #flashinfo-div a{
+                    color: #DF6300;
+                 }`);
+    let extraClass = '';
+    if (api.settings.get('floatButtonStealth'))
+        extraClass = 'mini-stealth';
+    j.$('body').after(j.html(`<div id="flash-div-top" dir="${api.storage.langDirection()}" style="text-align: center;pointer-events: none;position: fixed;top:-5px;width:100%;z-index: 2147483647;left: 0;"></div>\
+        <div id="flash-div-bottom" dir="${api.storage.langDirection()}" style="text-align: center;pointer-events: none;position: fixed;bottom:0px;width:100%;z-index: 2147483647;left: 0;"><div id="flash" style="display:none;  background-color: red;padding: 20px; margin: 0 auto;max-width: 60%;          -webkit-border-radius: 20px;-moz-border-radius: 20px;border-radius: 20px;background:rgba(227,0,0,0.6);"></div></div>\
+        <div id="flashinfo-div" dir="${api.storage.langDirection()}" class="${extraClass}" style="text-align: center;pointer-events: none;position: fixed;bottom:0px;width:100%;left: 0;">`));
+}
+let lazyloaded = false;
+let lazyimages = [];
+function lazyload(doc, scrollElement = '.mdl-layout__content') {
+    /* lazyload.js (c) Lorenzo Giuliani
+     * MIT License (http://www.opensource.org/licenses/mit-license.html)
+     *
+     * expects a list of:
+     * `<img src="blank.gif" data-src="my_image.png" width="600" height="400" class="lazy">`
+     */
+    // eslint-disable-next-line
+    function loadImage(el, fn) {
+        if (!j.$(el).is(':visible'))
+            return false;
+        if (j.$(el).hasClass('lazyBack')) {
+            j.$(el)
+                .css('background-image', `url(${el.getAttribute('data-src')})`)
+                .removeClass('lazyBack');
+        }
+        else {
+            const img = new Image();
+            const src = el.getAttribute('data-src');
+            img.onload = function () {
+                if (el.parent)
+                    el.parent.replaceChild(img, el);
+                else
+                    el.src = src;
+                // eslint-disable-next-line
+                fn ? fn() : null;
+            };
+            img.src = src;
+        }
+    }
+    for (let i = 0; i < lazyimages.length; i++) {
+        $(lazyimages[i]).addClass('init');
+    }
+    lazyimages = [];
+    const query = doc.find('img.lazy.init, .lazyBack.init');
+    const processScroll = function () {
+        for (let i = 0; i < lazyimages.length; i++) {
+            if (utils.elementInViewport(lazyimages[i], 600)) {
+                // eslint-disable-next-line
+                loadImage(lazyimages[i], function () {
+                    lazyimages.splice(i, i);
+                });
+            }
+            if (!$(lazyimages[i]).length) {
+                lazyimages.splice(i, i);
+            }
+        }
+    };
+    // Array.prototype.slice.call is not callable under our lovely IE8
+    for (let i = 0; i < query.length; i++) {
+        lazyimages.push(query[i]);
+        $(query[i]).removeClass('init');
+    }
+    processScroll();
+    if (!lazyloaded) {
+        lazyloaded = true;
+        doc.find(scrollElement).scroll(function () {
+            processScroll();
+        });
+    }
+}
+function elementInViewport(el, horizontalOffset = 0) {
+    const rect = el.getBoundingClientRect();
+    return (rect.top >= 0 &&
+        rect.left >= 0 &&
+        // @ts-ignore
+        rect.top - horizontalOffset <= (window.innerHeight || document.documentElement.clientHeight));
+}
+function wait(ms) {
+    return new Promise(resolve => {
+        setTimeout(resolve, ms);
+    });
+}
+function pageUrl(page, type, id) {
+    switch (page) {
+        case 'mal':
+            return `https://myanimelist.net/${type}/${id}`;
+        case 'anilist':
+            return `https://anilist.co/${type}/${id}`;
+        case 'kitsu':
+            return `https://kitsu.app/${type}/${id}`;
+        case 'simkl':
+            return `https://simkl.com/${type}/${id}`;
+        default:
+            throw `${page} not a valid page`;
+    }
+}
+function returnYYYYMMDD(numFromToday = 0) {
+    const d = new Date();
+    d.setDate(d.getDate() + numFromToday);
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    return `${d.getFullYear()}-${month}-${day}`;
+}
+function htmlDecode(text) {
+    return $('<textarea/>').html(j.html(text)).text();
+}
+function isFirefox() {
+    return Boolean(typeof browser !== 'undefined' && typeof chrome !== 'undefined');
+}
+function waitForPageToBeVisible() {
+    const condition = () => Boolean(!document.visibilityState || document.visibilityState === 'visible');
+    if (condition())
+        return Promise.resolve();
+    con.log('Page in background');
+    const { asyncWaitUntilTrue: awaitUi } = getAsyncWaitUntilTrue(() => condition());
+    return awaitUi().then(() => {
+        con.log('Page is visible');
+    });
+}
+async function clearCache() {
+    const cacheObj = await api.storage.list();
+    let deleted = 0;
+    for (const key in cacheObj) {
+        if (!utils.syncRegex.test(key) && !/(^tagSettings\/.*)/.test(key)) {
+            api.storage.remove(key);
+            deleted++;
+        }
+    }
+    utils.flashm(`Cache Cleared [${deleted}]`);
+}
+function sortAlphabetically(a, b) {
+    if (a.toLowerCase() < b.toLowerCase())
+        return -1;
+    if (a.toLowerCase() > b.toLowerCase())
+        return 1;
+    return 0;
+}
+function isDomainMatching(url, domain) {
+    const urlObj = new URL(url);
+    const { host } = urlObj;
+    return host === domain || host.endsWith(`.${domain}`);
+}
+function upperCaseFirstLetter(string) {
+    if (!string || string.length < 2)
+        return string;
+    return string.charAt(0).toUpperCase() + string.slice(1);
+}
+//# sourceMappingURL=general.js.map

@@ -1,0 +1,3 @@
+[submodule "sync_app/vendor/malsync"]
+	path = sync_app/vendor/malsync
+	url = https://github.com/MALSync/MALSync.git

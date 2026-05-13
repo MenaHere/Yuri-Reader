@@ -1,11 +1,7 @@
-// Yuri-Sync — MALSync-based tracking service for Yuri-Reader
-// Copyright (C) 2025
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// SPDX-License-Identifier: GPL-3.0
 
 import { handleAuthGetUrl, handleAuthExchange, handleAuthRefresh } from './routes/auth';
+import { handleSettingsSet, handleSettingsGet } from './routes/settings';
 import { handleSearch } from './routes/search';
 import { handleEntryGet, handleEntryUpdate, handleEntryAdd, handleEntryDelete } from './routes/entry';
 import { handleTrackAuto } from './routes/track';
@@ -30,7 +26,7 @@ export interface JsonRpcError {
   data?: unknown;
 }
 
-export function handleMessage(request: JsonRpcRequest): JsonRpcResponse {
+export async function handleMessage(request: JsonRpcRequest): Promise<JsonRpcResponse> {
   const { method, params, id } = request;
 
   try {
@@ -38,7 +34,7 @@ export function handleMessage(request: JsonRpcRequest): JsonRpcResponse {
 
     switch (method) {
       case 'health.ping':
-        result = { status: 'ok', version: '0.1.0' };
+        result = { status: 'ok', version: '0.2.0' };
         break;
 
       case 'auth.getUrl':
@@ -52,24 +48,31 @@ export function handleMessage(request: JsonRpcRequest): JsonRpcResponse {
         break;
 
       case 'search.query':
-        result = handleSearch(params || {});
+        result = await handleSearch(params || {});
         break;
 
       case 'entry.get':
-        result = handleEntryGet(params || {});
+        result = await handleEntryGet(params || {});
         break;
       case 'entry.update':
-        result = handleEntryUpdate(params || {});
+        result = await handleEntryUpdate(params || {});
         break;
       case 'entry.add':
-        result = handleEntryAdd(params || {});
+        result = await handleEntryAdd(params || {});
         break;
       case 'entry.delete':
-        result = handleEntryDelete(params || {});
+        result = await handleEntryDelete(params || {});
         break;
 
       case 'track.auto':
-        result = handleTrackAuto(params || {});
+        result = await handleTrackAuto(params || {});
+        break;
+
+      case 'settings.set':
+        result = handleSettingsSet(params || {});
+        break;
+      case 'settings.get':
+        result = handleSettingsGet(params || {});
         break;
 
       default:

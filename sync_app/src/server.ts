@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0
 // Yuri-Sync — MALSync-based tracking service for Yuri-Reader
-// Copyright (C) 2025
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+
+// MUST load shims before any MALSync vendor imports
+import './shim/index';
 
 import * as net from 'net';
 import { handleMessage } from './protocol';
@@ -22,8 +21,17 @@ const server = net.createServer((socket) => {
       if (!line.trim()) continue;
       try {
         const message = JSON.parse(line);
-        const response = handleMessage(message);
-        socket.write(JSON.stringify(response) + '\n');
+        handleMessage(message).then((response) => {
+          socket.write(JSON.stringify(response) + '\n');
+        }).catch((err) => {
+          socket.write(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              error: { code: -32603, message: err.message || String(err) },
+              id: null,
+            }) + '\n',
+          );
+        });
       } catch (e) {
         socket.write(
           JSON.stringify({
@@ -40,26 +48,18 @@ const server = net.createServer((socket) => {
     console.error('Socket error:', err.message);
   });
 
-  socket.on('close', () => {
-    // Client disconnected
-  });
+  socket.on('close', () => {});
 });
 
 server.listen({ host: HOST, port: 0 }, () => {
   const address = server.address() as net.AddressInfo;
-  // Print READY:PORT so parent process knows where to connect
   console.log(`READY:${address.port}`);
 });
 
-// Graceful shutdown
 process.on('SIGTERM', () => {
-  server.close(() => {
-    process.exit(0);
-  });
+  server.close(() => process.exit(0));
 });
 
 process.on('SIGINT', () => {
-  server.close(() => {
-    process.exit(0);
-  });
+  server.close(() => process.exit(0));
 });

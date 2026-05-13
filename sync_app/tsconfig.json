@@ -5,15 +5,40 @@
     "lib": ["es2020"],
     "types": ["node"],
     "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
+    "rootDir": ".",
+    "strict": false,
+    "noImplicitAny": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "declaration": true,
-    "sourceMap": true
+    "declaration": false,
+    "sourceMap": true,
+    "noEmitOnError": false
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/**/*",
+    "vendor/malsync/src/_provider/**/*",
+    "vendor/malsync/src/utils/Cache.ts",
+    "vendor/malsync/src/utils/console.ts",
+    "vendor/malsync/src/utils/slugs.ts",
+    "vendor/malsync/src/utils/general.ts",
+    "vendor/malsync/src/utils/localStore.ts",
+    "vendor/malsync/src/utils/progress.ts",
+    "vendor/malsync/src/utils/progressRelease.ts",
+    "vendor/malsync/src/utils/IntlWrapper.ts",
+    "vendor/malsync/src/utils/time.ts",
+    "vendor/malsync/src/utils/errors.ts",
+    "vendor/malsync/src/api/messageInterface.ts",
+    "vendor/malsync/src/api/request/requestInterface.ts",
+    "vendor/malsync/src/background/releaseProgressUtils.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "vendor/malsync/src/_provider/Search/correctionApp.vue",
+    "vendor/malsync/src/_provider/Search/components",
+    "vendor/malsync/src/_provider/Search/correctionStyle.less",
+    "vendor/malsync/src/_provider/Search/vueSearchClass.ts"
+  ]
 }
