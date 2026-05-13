@@ -26,21 +26,26 @@ The two components communicate via **TCP localhost sockets** (JSON-RPC 2.0). The
 ## Quick Start
 
 ### Build the sync service
+
 ```bash
 cd sync_app
 npm install
 npm run build
-npm run build:binary   # Creates dist/yuri-sync
+npm run build:binary   # Creates dist/binaries/yuri-sync
 ```
 
 ### Copy binary to app assets
+
 ```bash
-cp sync_app/dist/yuri-sync app/assets/yuri-sync/
+cp sync_app/dist/binaries/yuri-sync app/assets/yuri-sync/
 ```
 
 ### Run the Flutter app
+
 ```bash
 cd app
+flutter pub get
+dart pub get --directory=rust_builder/cargokit/build_tool
 flutter run
 ```
 
@@ -52,19 +57,94 @@ flutter run
 4. The Flutter app parses the port and connects via TCP
 5. All tracker communication goes through JSON-RPC over TCP
 
+## JSON-RPC API
+
+### Health
+
+| Method        | Params | Returns                  |
+|---------------|--------|--------------------------|
+| `health.ping` | —      | `{status, version}`      |
+
+### Authentication
+
+| Method         | Params                           | Returns        |
+|----------------|----------------------------------|----------------|
+| `auth.getUrl`  | `{provider}`                     | `{url}`        |
+| `auth.exchange`| `{provider, token, refreshToken}`| `{status}`     |
+
+Supported providers: `anilist`, `mal`, `kitsu`, `simkl`, `shikimori`, `mangabaka`
+
+### Search
+
+| Method         | Params                        | Returns               |
+|----------------|-------------------------------|-----------------------|
+| `search.query` | `{query, type, provider}`     | `{provider, query, type, results}` |
+
+### Entry Management
+
+| Method          | Params                                    | Returns        |
+|-----------------|-------------------------------------------|----------------|
+| `entry.get`     | `{url, type, provider, mediaId}`          | entry object   |
+| `entry.update`  | `{url, type, provider, progress, status, score, volume, startDate, finishDate, tags}` | entry object |
+| `entry.add`     | `{url, type, provider, progress, status}` | entry object   |
+| `entry.delete`  | `{url, type, provider, mediaId}`          | `{status}`     |
+
+### Auto-Track
+
+| Method        | Params                              | Returns                  |
+|---------------|-------------------------------------|--------------------------|
+| `track.auto`  | `{title, type, chapter, episode, provider}` | `{status, title, url, progress}` |
+
+Searches for the title, gets/creates the entry, sets progress, and syncs.
+
+### Settings
+
+| Method           | Params          | Returns        |
+|------------------|-----------------|----------------|
+| `settings.set`   | `{key, value}`  | `{key, status}`|
+| `settings.get`   | `{key}`         | `{key, value}` |
+
 ## Features
 
 - ✅ TCP localhost IPC (cross-platform)
 - ✅ JSON-RPC 2.0 protocol
 - ✅ Process spawner with binary extraction (mobile)
 - ✅ Health check endpoint
-- 🔄 Provider APIs (AniList, MAL, Kitsu, Simkl) — in progress
-- 🔄 Auto-tracking from reader — in progress
-- 🔄 Site adapters — in progress
+- ✅ Provider search (AniList, MAL, Kitsu, Simkl, Shikimori)
+- ✅ Entry get/update/add/delete
+- ✅ Auto-tracking from reader progress
+- ✅ OAuth token forwarding from native trackers
+- ✅ Settings get/set for runtime configuration
+
+## Integration Points
+
+### Reader → Tracker Sync
+
+When a chapter is read, `updateTrackChapterRead()` in `lib/utils/extensions/chapter_extensions.dart`:
+
+1. Updates native trackers (AniList, MAL, etc.) as before
+2. Calls `YuriSyncService.trackAuto()` to sync via MALSync providers
+
+### Auth Token Forwarding
+
+When a user logs into AniList or MyAnimeList in the app, the OAuth tokens are automatically forwarded to the sync service via `YuriSyncService.setAuthToken()`.
+
+## Submodule
+
+MALSync is included as a Git submodule:
+
+```bash
+git submodule update --remote sync_app/vendor/malsync
+```
 
 ## TODO
 
-- [ ] Port MALSync provider APIs (AniList, MAL, Kitsu, Simkl)
-- [ ] Create lightweight site adapters
-- [ ] Implement auto-track service in Flutter app
+- [x] TCP server with JSON-RPC 2.0
+- [x] Process spawner (desktop + mobile)
+- [x] Search via MALSync providers
+- [x] Entry get/update/add/delete
+- [x] Auto-track from reader
+- [x] Auth token forwarding
+- [x] Settings get/set
+- [ ] Site adapters for chapter recognition
 - [ ] Google Drive backup/restore sync

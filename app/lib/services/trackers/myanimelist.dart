@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -12,6 +13,7 @@ import 'package:yuri_reader/models/track_search.dart';
 import 'package:yuri_reader/modules/more/settings/track/myanimelist/model.dart';
 import 'package:yuri_reader/modules/more/settings/track/providers/track_providers.dart';
 import 'package:yuri_reader/services/http/m_client.dart';
+import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';
 import 'package:yuri_reader/utils/log/logger.dart';
 import 'base_tracker.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -131,6 +133,15 @@ class MyAnimeList extends _$MyAnimeList implements BaseTracker {
             oAuth: jsonEncode(oAuth.toJson()),
           ),
         );
+
+    // Forward token to the Yuri-Sync MALSync bridge.
+    unawaited(
+      YuriSyncService().setAuthToken(
+        'mal',
+        oAuth.accessToken!,
+        refreshToken: oAuth.refreshToken,
+      ),
+    );
   }
 
   @override

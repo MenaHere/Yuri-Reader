@@ -51,6 +51,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:yuri_reader/utils/window_geometry.dart';
+import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';
 
 late Isar isar;
 DiscordRPC? discordRpc;
@@ -138,6 +139,9 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
   }
   await storage.deleteBtDirectory();
   await cfResolutionWebviewServer();
+
+  // Start the Yuri-Sync MALSync bridge in the background.
+  unawaited(YuriSyncService().ensureInitialized());
 }
 
 class MyApp extends ConsumerStatefulWidget {

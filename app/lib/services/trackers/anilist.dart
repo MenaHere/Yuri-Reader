@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:yuri_reader/eval/model/m_bridge.dart';
@@ -9,6 +10,7 @@ import 'dart:convert';
 import 'package:yuri_reader/models/track_search.dart';
 import 'package:yuri_reader/modules/more/settings/track/myanimelist/model.dart';
 import 'package:yuri_reader/modules/more/settings/track/providers/track_providers.dart';
+import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';
 import 'package:yuri_reader/services/http/m_client.dart';
 import 'base_tracker.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -75,6 +77,11 @@ class Anilist extends _$Anilist implements BaseTracker {
               oAuth: jsonEncode(aLOAuth.toJson()),
             ),
           );
+
+      // Forward token to the Yuri-Sync MALSync bridge.
+      unawaited(
+        YuriSyncService().setAuthToken('anilist', aLOAuth.accessToken!),
+      );
 
       return true;
     } catch (e) {

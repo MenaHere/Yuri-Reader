@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +15,7 @@ import 'package:yuri_reader/utils/extensions/manga_extensions.dart';
 import 'package:yuri_reader/modules/more/settings/track/providers/track_providers.dart';
 import 'package:yuri_reader/providers/storage_provider.dart';
 import 'package:yuri_reader/services/download_manager/download_isolate_pool.dart';
+import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';
 import 'package:yuri_reader/services/download_manager/m_downloader.dart';
 import 'package:yuri_reader/utils/chapter_recognition.dart';
 import 'package:yuri_reader/utils/extensions/string_extensions.dart';
@@ -108,6 +110,11 @@ extension ChapterExtension on Chapter {
         .mangaIdEqualTo(manga.id!)
         .findAllSync();
 
+    // Always attempt to sync via the Yuri-Sync MALSync bridge (fire-and-forget).
+    unawaited(
+      _syncViaYuriSync(manga.name!, chapterNumber, manga.itemType),
+    );
+
     if (tracks.isEmpty) return;
     for (var track in tracks) {
       final service = isar.trackPreferences
@@ -141,6 +148,24 @@ extension ChapterExtension on Chapter {
             )
             .updateManga();
       }
+    }
+  }
+
+  static Future<void> _syncViaYuriSync(
+    String title,
+    int chapterNumber,
+    ItemType itemType,
+  ) async {
+    try {
+      final type = itemType == ItemType.anime ? 'anime' : 'manga';
+      await YuriSyncService().trackAuto(
+        title: title,
+        type: type,
+        chapter: type == 'manga' ? chapterNumber : null,
+        episode: type == 'anime' ? chapterNumber : null,
+      );
+    } catch (_) {
+      // Silently ignore bridge errors so they never break the reader.
     }
   }
 }
