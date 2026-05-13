@@ -4,10 +4,10 @@ project(runner LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "mangayomi")
+set(BINARY_NAME "yurireader")
 # The unique GTK application identifier for this application. See:
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
-set(APPLICATION_ID "com.kodjodevf.mangayomi")
+set(APPLICATION_ID "com.kodjodevf.yurireader")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -120,6 +120,10 @@ install(FILES "${FLUTTER_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
 
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/bundle/lib/libmtorrentserver.so" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   COMPONENT Runtime)
+
+# Install the Yuri-Sync binary next to the executable
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../assets/yuri-sync/yuri-sync" DESTINATION "${CMAKE_INSTALL_PREFIX}"
+  COMPONENT Runtime PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 
 foreach(bundled_library ${PLUGIN_BUNDLED_LIBRARIES})
   install(FILES "${bundled_library}"

@@ -2,16 +2,16 @@
  <img width=200px height=200px src="assets/app_icons/icon-red.png"/>
 </p>
 
-<h1 align="center"> Mangayomi </h1>
+<h1 align="center"> YuriReader </h1>
 
 <div align="center">
 
- [![GitHub downloads](https://img.shields.io/github/downloads/kodjodevf/mangayomi/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/kodjodevf/mangayomi/releases)
-![star](https://img.shields.io/github/stars/kodjodevf/mangayomi)
+ [![GitHub downloads](https://img.shields.io/github/downloads/kodjodevf/yurireader/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/kodjodevf/yurireader/releases)
+![star](https://img.shields.io/github/stars/kodjodevf/yurireader)
  [![Discord server](https://img.shields.io/discord/1157628512077893666.svg?label=&labelColor=6A7EC2&color=7389D8&logo=discord&logoColor=FFFFFF)](https://discord.com/invite/EjfBuYahsP) 
 
 
-Mangayomi is an open-source Flutter app for reading manga, novels, and watching animes across multiple platforms.
+YuriReader is an open-source Flutter app for reading manga, novels, and watching animes across multiple platforms.
 </div>
 
 ## Features
@@ -30,16 +30,16 @@ Features include:
 </div>
 
 ## Download
-Get the app from our [releases page](https://github.com/kodjodevf/mangayomi/releases).
+Get the app from our [releases page](https://github.com/kodjodevf/yurireader/releases).
 
 ## iOS Sideloading Sources
-<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/source.json"><img alt="AltStore Source" src="repo/images/buttons/altstore_button.png" width="150"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/kodjodevf/yurireader/refs/heads/main/repo/source.json"><img alt="AltStore Source" src="repo/images/buttons/altstore_button.png" width="150"></a>
 &nbsp;
-<a href="https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/source.json"><img alt="Feather Source" src="repo/images/buttons/feather_button.png" width="150"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://raw.githubusercontent.com/kodjodevf/yurireader/refs/heads/main/repo/source.json"><img alt="Feather Source" src="repo/images/buttons/feather_button.png" width="150"></a>
 &nbsp;
-<a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/source.json"><img alt="Sidestore Source" src="repo/images/buttons/sidestore_button.png" width="150"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/kodjodevf/yurireader/refs/heads/main/repo/source.json"><img alt="Sidestore Source" src="repo/images/buttons/sidestore_button.png" width="150"></a>
 &nbsp;
-<a href="https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/source.json"><img alt="Direct URL Source" src="repo/images/buttons/url_button.png" width="150"></a>
+<a href="https://raw.githubusercontent.com/kodjodevf/yurireader/refs/heads/main/repo/source.json"><img alt="Direct URL Source" src="repo/images/buttons/url_button.png" width="150"></a>
 
 Note: Only future releases (> 0.5.2) will be signed (and therefore have AltStore/SideStore compatibility).
 
@@ -47,7 +47,7 @@ Note: Only future releases (> 0.5.2) will be signed (and therefore have AltStore
 
 Contributions are welcome!
 
-To get started with extension development, see [CONTRIBUTING-DART.md](https://github.com/kodjodevf/mangayomi-extensions/blob/main/CONTRIBUTING-DART.md) for create sources in Dart or [CONTRIBUTING-JS.md](https://github.com/kodjodevf/mangayomi-extensions/blob/main/CONTRIBUTING-JS.md) for create sources in JavaScript.
+To get started with extension development, see [CONTRIBUTING-DART.md](https://github.com/kodjodevf/yurireader-extensions/blob/main/CONTRIBUTING-DART.md) for create sources in Dart or [CONTRIBUTING-JS.md](https://github.com/kodjodevf/yurireader-extensions/blob/main/CONTRIBUTING-JS.md) for create sources in JavaScript.
 
 ## Using flutter_rust_bridge
 
@@ -102,4 +102,4 @@ flutter run
 
 ## Disclaimer
 
-Mangayomi is not hosting any kind of content and the developer(s) of this application does not have any affiliation with the content providers that are freely available in the internet.
+YuriReader is not hosting any kind of content and the developer(s) of this application does not have any affiliation with the content providers that are freely available in the internet.
