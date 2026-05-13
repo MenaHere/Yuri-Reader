@@ -25,6 +25,18 @@ The two components communicate via **TCP localhost sockets** (JSON-RPC 2.0). The
 
 ## Quick Start
 
+### Clone
+- It contains a **git submodule**, so use `--recursive` or run `git submodule update --init --recursive` after cloning
+
+    ```bash
+    git clone --recursive https://github.com/MenaHere/Yuri-Reader.git
+    ```
+- Or with SSH:
+
+    ```bash
+    git clone --recursive git@github.com:MenaHere/Yuri-Reader.git
+    ```
+
 ### Build the sync service
 
 ```bash
