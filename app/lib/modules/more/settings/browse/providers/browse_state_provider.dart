@@ -29,16 +29,16 @@ class AndroidProxyServerState extends _$AndroidProxyServerState {
     return proxyServer;
   }
 
-  void set(String value) {
+  Future<void> set(String value) async {
     final settings = isar.settings.getSync(227);
     state = value;
-    isar.writeTxnSync(
-      () => isar.settings.putSync(
+    await isar.writeTxn(() async {
+      await isar.settings.put(
         settings!
           ..androidProxyServer = value
           ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-      ),
-    );
+      );
+    });
   }
 }
 

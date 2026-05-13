@@ -37,10 +37,18 @@ class MExtensionServerPlatform {
           final jrePath = settings?.jrePath;
           final serverJarPath = settings?.extensionServerPath;
           if ((jrePath?.isEmpty ?? true) || (serverJarPath?.isEmpty ?? true)) {
+            debugPrint(
+              '[ExtensionServer] JRE or extension server JAR not configured. '
+              'Please set them in Settings > Browse > Extension Server.',
+            );
             return;
           }
           if (!await File(jrePath!).exists() ||
               !await File(serverJarPath!).exists()) {
+            debugPrint(
+              '[ExtensionServer] JRE or extension server JAR not found at '
+              'configured paths. Please reconfigure in Settings > Browse > Extension Server.',
+            );
             return;
           }
           await MExtensionServer().startServer(
@@ -51,14 +59,12 @@ class MExtensionServerPlatform {
         } else {
           await MExtensionServer().startServer(port);
         }
-        ref
+        await ref
             .read(androidProxyServerStateProvider.notifier)
             .set("http://127.0.0.1:$port");
       }
     } catch (e) {
-      if (kDebugMode) {
-        print(e);
-      }
+      debugPrint('[ExtensionServer] Failed to start server: $e');
     }
   }
 

@@ -260,8 +260,8 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
                       onPressed: () => showAndroidProxyServerDialog(
                         context,
                         proxyServer: androidProxyServer,
-                        onConfirm: (server) {
-                          ref
+                        onConfirm: (server) async {
+                          await ref
                               .read(androidProxyServerStateProvider.notifier)
                               .set(server);
                         },
@@ -321,8 +321,8 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
                             onPressed: () => showAndroidProxyServerDialog(
                               context,
                               proxyServer: androidProxyServer,
-                              onConfirm: (server) {
-                                ref
+                              onConfirm: (server) async {
+                                await ref
                                     .read(
                                       androidProxyServerStateProvider.notifier,
                                     )
