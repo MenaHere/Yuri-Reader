@@ -9,12 +9,51 @@ import 'package:yuri_reader/modules/browse/extension/widgets/extension_lang_list
 import 'package:yuri_reader/utils/global_style.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
-class ExtensionsLang extends ConsumerWidget {
+class ExtensionsLang extends ConsumerStatefulWidget {
   final ItemType itemType;
   const ExtensionsLang({required this.itemType, super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ExtensionsLang> createState() => _ExtensionsLangState();
+}
+
+class _ExtensionsLangState extends ConsumerState<ExtensionsLang> {
+  final Map<String, bool> _optimistic = {};
+
+  void _updateLang(String lang, bool val, List<Source> entries) {
+    setState(() => _optimistic[lang] = val);
+    isar.writeTxn(() async {
+      for (var source in entries) {
+        if (source.lang!.toLowerCase() == lang.toLowerCase()) {
+          await isar.sources.put(
+            source
+              ..isActive = val
+              ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+          );
+        }
+      }
+    });
+  }
+
+  void _setAll(bool enable, List<Source> entries) {
+    final languages = entries.map((e) => e.lang!).toSet().toList();
+    for (var lang in languages) {
+      _optimistic[lang] = enable;
+    }
+    setState(() {});
+    isar.writeTxn(() async {
+      for (var source in entries) {
+        await isar.sources.put(
+          source
+            ..isActive = enable
+            ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+        );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = l10nLocalizations(context)!;
     return Scaffold(
       appBar: AppBar(
@@ -29,20 +68,16 @@ class ExtensionsLang extends ConsumerWidget {
               ];
             },
             onSelected: (value) {
-              isar.writeTxnSync(() {
-                bool enable = true;
-                if (value == 0) {
-                } else if (value == 1) {
-                  enable = false;
-                }
-                final sources = isar.sources
+              final enable = value == 0;
+              isar.writeTxn(() async {
+                final sources = await isar.sources
                     .filter()
                     .idIsNotNull()
                     .and()
-                    .itemTypeEqualTo(itemType)
-                    .findAllSync();
+                    .itemTypeEqualTo(widget.itemType)
+                    .findAll();
                 for (var source in sources) {
-                  isar.sources.putSync(
+                  await isar.sources.put(
                     source
                       ..isActive = enable
                       ..updatedAt = DateTime.now().millisecondsSinceEpoch,
@@ -58,39 +93,34 @@ class ExtensionsLang extends ConsumerWidget {
             .filter()
             .idIsNotNull()
             .and()
-            .itemTypeEqualTo(itemType)
+            .itemTypeEqualTo(widget.itemType)
             .watch(fireImmediately: true),
         builder: (context, snapshot) {
           List<Source>? entries = snapshot.hasData ? snapshot.data : [];
           final languages = entries!.map((e) => e.lang!).toSet().toList();
+
+          if (_optimistic.isNotEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) setState(() => _optimistic.clear());
+            });
+          }
 
           languages.sort((a, b) => a.compareTo(b));
           return SuperListView.builder(
             itemCount: languages.length,
             itemBuilder: (context, index) {
               final lang = languages[index];
+              final dbValue = entries
+                  .where(
+                    (element) =>
+                        element.lang!.toLowerCase() == lang.toLowerCase() &&
+                        element.isActive!,
+                  )
+                  .isNotEmpty;
               return ExtensionLangListTileWidget(
                 lang: lang,
-                onChanged: (val) {
-                  isar.writeTxnSync(() {
-                    for (var source in entries) {
-                      if (source.lang!.toLowerCase() == lang.toLowerCase()) {
-                        isar.sources.putSync(
-                          source
-                            ..isActive = val
-                            ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-                        );
-                      }
-                    }
-                  });
-                },
-                value: entries
-                    .where(
-                      (element) =>
-                          element.lang!.toLowerCase() == lang.toLowerCase() &&
-                          element.isActive!,
-                    )
-                    .isNotEmpty,
+                onChanged: (val) => _updateLang(lang, val, entries),
+                value: _optimistic[lang] ?? dbValue,
               );
             },
           );
