@@ -7,7 +7,7 @@
     "build": "node build-ts.js",
     "dev": "ts-node src/server.ts",
     "start": "node dist/src/server.js",
-    "build:binary": "pkg dist/src/server.js --targets node18-linux-x64,node18-win-x64,node18-macos-x64 --out-path dist/binaries/"
+    "build:binary": "pkg dist/src/server.js --targets node22-linux-x64,node22-win-x64,node22-macos-x64 --out-path dist/binaries/"
   },
   "keywords": [
     "manga",
@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.41",
+    "@yao-pkg/pkg": "^6.22.0",
     "pkg": "^5.8.1",
     "ts-node": "^10.9.0",
     "typescript": "^5.3.0"

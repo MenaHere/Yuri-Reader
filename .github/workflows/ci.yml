@@ -29,7 +29,7 @@ jobs:
       - name: Setup Node 18 (pkg)
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 24
           cache: npm
           cache-dependency-path: ts/package-lock.json
 
@@ -37,7 +37,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.pkg-cache
-          key: pkg-cache-node18-${{ runner.os }}
+          key: pkg-cache-node22-${{ runner.os }}
 
       - name: Install Linux build deps
         run: |
