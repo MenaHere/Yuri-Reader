@@ -108,7 +108,7 @@ jobs:
 
       - name: Compose + build Linux
         if: steps.check.outputs.changed == 'true'
-        run: ./scripts/build.sh linux
+        run: ./.scripts/build.sh linux
 
       - name: Package Linux bundle
         if: steps.check.outputs.changed == 'true'
