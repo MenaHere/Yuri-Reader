@@ -2,6 +2,14 @@
 
 ## Version 0.1.0
 
+### [2026-08-30]
+
+#### Changed
+- Restructured the repo: mangayomi and malsync are pinned submodules, the bridge code lives in `dart/` + `ts/` (each with its own vendor), combined only at build time
+- Added the weekend sync + release bot (BotYYYYMMDDnnn commits, version bumps, GitHub Releases)
+- Split the license: Apache-2.0 (app) + GPL-3.0 (sync)
+- Linux-only builds and releases for the testing loop
+
 ### [2026-05-13]
 
 #### Added

@@ -1,3 +1,6 @@
 [submodule "ts/vendor/malsync"]
 	path = ts/vendor/malsync
 	url = https://github.com/MALSync/MALSync.git
+[submodule "dart/vendor/mangayomi"]
+	path = dart/vendor/mangayomi
+	url = https://github.com/kodjodevf/mangayomi.git

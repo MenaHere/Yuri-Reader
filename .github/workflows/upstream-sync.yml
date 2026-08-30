@@ -1,0 +1,172 @@
+name: upstream-sync
+
+# Weekend bot: tries to sync Yuri-Reader with upstream mangayomi + malsync,
+# builds Linux, and releases the bundle on success.
+# - No upstream updates (and not forced) -> run succeeds silently.
+# - Sync + build green -> BotYYYYMMDDnnn commit (submodule bumps + version
+#   bump + changelog entry) and a GitHub Release (tag v<version>).
+# - Anything breaks -> run fails, which is the only notification you get.
+
+on:
+  schedule:
+    - cron: '0 9 * * 0,6'   # Sat + Sun 09:00 UTC (17:00 +0800)
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Build + release even without upstream updates'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Check for upstream updates
+        id: check
+        run: |
+          git -C dart/vendor/mangayomi fetch origin main
+          git -C ts/vendor/malsync fetch origin master
+          CUR_MANGA="$(git -C dart/vendor/mangayomi rev-parse HEAD)"
+          LATEST_MANGA="$(git -C dart/vendor/mangayomi rev-parse origin/main)"
+          CUR_MAL="$(git -C ts/vendor/malsync rev-parse HEAD)"
+          LATEST_MAL="$(git -C ts/vendor/malsync rev-parse origin/master)"
+          MANGA_COUNT="$(git -C dart/vendor/mangayomi rev-list --count "$CUR_MANGA".."$LATEST_MANGA" 2>/dev/null || echo 0)"
+          MAL_COUNT="$(git -C ts/vendor/malsync rev-list --count "$CUR_MAL".."$LATEST_MAL" 2>/dev/null || echo 0)"
+          echo "mangayomi: $CUR_MANGA -> $LATEST_MANGA ($MANGA_COUNT commits)"
+          echo "malsync:   $CUR_MAL -> $LATEST_MAL ($MAL_COUNT commits)"
+          if [ "$CUR_MANGA" = "$LATEST_MANGA" ] && [ "$CUR_MAL" = "$LATEST_MAL" ]; then
+            echo "real=false" >> "$GITHUB_OUTPUT"
+            if [ "${{ inputs.force }}" != "true" ]; then
+              echo "No upstream updates - nothing to sync."
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "real=true" >> "$GITHUB_OUTPUT"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "mangayomi=$LATEST_MANGA" >> "$GITHUB_OUTPUT"
+            echo "malsync=$LATEST_MAL" >> "$GITHUB_OUTPUT"
+            echo "manga_count=$MANGA_COUNT" >> "$GITHUB_OUTPUT"
+            echo "mal_count=$MAL_COUNT" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump submodules
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git -C dart/vendor/mangayomi checkout "${{ steps.check.outputs.mangayomi }}"
+          git -C ts/vendor/malsync checkout "${{ steps.check.outputs.malsync }}"
+
+      - name: Setup Node 18 (pkg)
+        if: steps.check.outputs.changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - name: Cache pkg binaries
+        if: steps.check.outputs.changed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.pkg-cache
+          key: pkg-cache-node18-${{ runner.os }}
+
+      - name: Install Linux build deps
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+
+      - name: Cache Flutter SDK
+        if: steps.check.outputs.changed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: /opt/hostedtoolcache/flutter
+          key: flutter-3.41.9-${{ runner.os }}
+
+      - name: Install Flutter
+        if: steps.check.outputs.changed == 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.41.9   # matches Dart ^3.11.5 in dart/pubspec.yaml
+          cache: true
+
+      - name: Compose + build Linux
+        if: steps.check.outputs.changed == 'true'
+        run: ./scripts/build.sh linux
+
+      - name: Package Linux bundle
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          cd .build/app/build/linux/x64/release
+          tar czf "$GITHUB_WORKSPACE/yuri-reader-linux.tar.gz" bundle/
+
+      - name: Bump version + changelog
+        if: steps.check.outputs.real == 'true'
+        run: |
+          VER="$(grep '^version:' dart/pubspec.yaml | cut -d' ' -f2)"
+          if [[ "$VER" == *+* ]]; then
+            BASE="${VER%+*}"
+            BUILD="${VER##*+}"
+            NEW_VER="${BASE}+$((BUILD + 1))"
+          else
+            NEW_VER="${VER}+1"
+          fi
+          sed -i "s/^version: .*/version: $NEW_VER/" dart/pubspec.yaml
+          DATE="$(date -u +%Y-%m-%d)"
+          {
+            printf '# Yuri-Reader - Change Log\n\n'
+            printf '## Version %s\n\n### [%s]\n\n#### Bot\n' "$NEW_VER" "$DATE"
+            printf -- '- Synced %s commits from [mangayomi](https://github.com/kodjodevf/mangayomi), %s commits from [malsync](https://github.com/MALSync/MALSync)\n' \
+              "${{ steps.check.outputs.manga_count }}" "${{ steps.check.outputs.mal_count }}"
+            tail -n +2 CHANGELOG.md
+          } > CHANGELOG.md.new && mv CHANGELOG.md.new CHANGELOG.md
+          echo "version: $VER -> $NEW_VER"
+
+      - name: Commit BotYYYYMMDDnnn
+        if: steps.check.outputs.real == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dart/vendor/mangayomi ts/vendor/malsync dart/pubspec.yaml CHANGELOG.md
+          SEQ=$(git log --format=%s --grep="^Bot$(date -u +%Y%m%d)" | wc -l)
+          TITLE="Bot$(date -u +%Y%m%d)$(printf '%03d' "$SEQ")"
+          git commit -m "$TITLE" -m "Sync mangayomi @ ${{ steps.check.outputs.mangayomi }} + malsync @ ${{ steps.check.outputs.malsync }}" || echo "nothing to commit"
+
+      - name: Push
+        if: steps.check.outputs.real == 'true'
+        run: git push
+
+      - name: Create or update release
+        if: steps.check.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(grep '^version:' dart/pubspec.yaml | cut -d' ' -f2)"
+          TAG="v${VERSION}"
+          NOTES="Sync mangayomi @ ${{ steps.check.outputs.mangayomi }} + malsync @ ${{ steps.check.outputs.malsync }}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Force rebuild: update the existing release in place
+            gh release upload "$TAG" yuri-reader-linux.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$NOTES"
+          else
+            gh release create "$TAG" yuri-reader-linux.tar.gz \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Yuri-Reader $TAG" \
+              --notes "$NOTES"
+          fi
