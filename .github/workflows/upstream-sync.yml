@@ -85,6 +85,17 @@ jobs:
           path: ~/.pkg-cache
           key: pkg-cache-node22-${{ runner.os }}
 
+      - name: Pre-fetch pkg base binaries
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          # pkg's own undici fetch silently fails on GitHub runners; curl works.
+          mkdir -p ~/.pkg-cache/v3.6
+          for t in linux-x64 win-x64 macos-x64; do
+            f=~/.pkg-cache/v3.6/fetched-v22.23.2-$t
+            [ -f "$f" ] || curl -fsSL --retry 3 "https://github.com/yao-pkg/pkg-fetch/releases/download/v3.6/node-v22.23.2-$t" -o "$f"
+            chmod +x "$f"
+          done
+
       - name: Install Linux build deps
         if: steps.check.outputs.changed == 'true'
         run: |
