@@ -1,6 +1,6 @@
 # Yuri-Reader - Change Log
 
-## Version 0.2.0
+## Version 0.2.1
 
 ### [2026-08-31]
 
