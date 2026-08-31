@@ -104,21 +104,21 @@ jobs:
         if: steps.check.outputs.changed == 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libasound2-dev libsoup-3.0-dev libmpv-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libasound2-dev libsoup-3.0-dev libmpv-dev libsecret-1-dev
 
       - name: Cache Flutter SDK
         if: steps.check.outputs.changed == 'true'
         uses: actions/cache@v4
         with:
           path: /opt/hostedtoolcache/flutter
-          key: flutter-3.41.9-${{ runner.os }}
+          key: flutter-3.47.2-${{ runner.os }}
 
       - name: Install Flutter
         if: steps.check.outputs.changed == 'true'
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: 3.41.9   # matches Dart ^3.11.5 in dart/pubspec.yaml
+          flutter-version: 3.47.2   # matches Dart ^3.13.1 in dart/pubspec.yaml
           cache: true
 
       - name: Flutter analyze
