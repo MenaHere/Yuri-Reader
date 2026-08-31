@@ -176,7 +176,10 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
   await AppLogger.init();
   unawaited(maybeShowCrashBanner());
   unawaited(MDownloader.initializeIsolatePool(poolSize: 6));
-  final hivePath = isApple ? "databases" : p.join("Mangayomi", "databases");
+  final docs = await getApplicationDocumentsDirectory();
+  final hivePath = isApple
+      ? "databases"
+      : p.join(StorageProvider.dataDirName(docs.path), "databases");
   await Hive.initFlutter(Platform.isAndroid ? "" : hivePath);
   Hive.registerAdapter(TrackSearchAdapter());
   if (isDesktop && !kDebugMode) {
@@ -352,7 +355,7 @@ class _MyAppState extends ConsumerState<MyApp>
       routeInformationParser: router.routeInformationParser,
       routerDelegate: router.routerDelegate,
       routeInformationProvider: router.routeInformationProvider,
-      title: 'MangaYomi',
+      title: 'YuriReader',
       scrollBehavior: AllowScrollBehavior(),
     );
   }

@@ -7,6 +7,11 @@
 #### Bot
 - Synced 606 commits from [mangayomi](https://github.com/kodjodevf/mangayomi), 0 commits from [malsync](https://github.com/MALSync/MALSync)
 
+#### Changed
+- App branding: window title, About links and Discord RPC now say YuriReader; the update check points at Yuri-Reader releases (Linux asset detection fixed for the tar.gz bundle)
+- "What's new" in About shows Yuri-Reader release notes with a wrapped, collapsible Mangayomi changelog section
+- Data folder: new installs use Documents/Yuri-Reader; existing Mangayomi folders are still used (fallback, no data loss)
+
 ## Version 0.1.0
 
 ### [2026-08-31]
