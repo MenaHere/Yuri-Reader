@@ -36,6 +36,7 @@ if [ -z "$PKG_BIN" ] || [ ! -f "$PKG_BIN" ]; then
   echo "error: no pkg binary matching $PKG_GLOB in ts/dist/binaries/ (pkg produced nothing?)" >&2
   exit 1
 fi
+mkdir -p "$OUT/assets/yuri-sync"
 cp "$PKG_BIN" "$OUT/assets/yuri-sync/yuri-sync"
 chmod +x "$OUT/assets/yuri-sync/yuri-sync"
 
