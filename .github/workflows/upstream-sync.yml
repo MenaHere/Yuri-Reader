@@ -65,10 +65,14 @@ jobs:
           fi
 
       - name: Bump submodules
-        if: steps.check.outputs.changed == 'true'
+        if: steps.check.outputs.real == 'true'
         run: |
           git -C dart/vendor/mangayomi checkout "${{ steps.check.outputs.mangayomi }}"
           git -C ts/vendor/malsync checkout "${{ steps.check.outputs.malsync }}"
+
+      - name: Sync dependency manifests
+        if: steps.check.outputs.real == 'true'
+        run: ./.scripts/sync-deps.sh
 
       - name: Setup Node 18 (pkg)
         if: steps.check.outputs.changed == 'true'
