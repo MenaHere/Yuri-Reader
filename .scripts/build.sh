@@ -21,6 +21,8 @@ echo "=== [3/5] tsc (build-ts.js) ==="
 (cd "$ROOT/ts" && npm run build)
 echo "=== [4/5] pkg (build:binary) ==="
 (cd "$ROOT/ts" && npm run build:binary)
+echo "--- dist/binaries after pkg:"
+ls -la "$ROOT/ts/dist/binaries/" 2>&1 || true
 
 case "$PLATFORM" in
   linux)   PKG_GLOB="*linux-x64*" ;;
@@ -29,9 +31,9 @@ case "$PLATFORM" in
   *) echo "error: unsupported platform: $PLATFORM" >&2; exit 1 ;;
 esac
 
-PKG_BIN="$(ls "$ROOT"/ts/dist/binaries/$PKG_GLOB 2>/dev/null | head -1)"
-if [ -z "$PKG_BIN" ]; then
-  echo "error: no pkg binary matching $PKG_GLOB in ts/dist/binaries/" >&2
+PKG_BIN="$(ls "$ROOT"/ts/dist/binaries/$PKG_GLOB 2>&1 | head -1)"
+if [ -z "$PKG_BIN" ] || [ ! -f "$PKG_BIN" ]; then
+  echo "error: no pkg binary matching $PKG_GLOB in ts/dist/binaries/ (pkg produced nothing?)" >&2
   exit 1
 fi
 cp "$PKG_BIN" "$OUT/assets/yuri-sync/yuri-sync"
