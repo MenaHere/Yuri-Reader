@@ -5,6 +5,13 @@
 ### [2026-08-31]
 
 #### Changed
+- About screen: link row with 4 labeled links (Yuri-Reader black, Mangayomi green, MALSync blue, Discord purple), each icon centered over a small subtitle
+
+## Version 0.2.0
+
+### [2026-08-31]
+
+#### Changed
 - Ported the fork overlay to mangayomi 0.9.0 (new reader, repositories layer, native crop-borders)
 - App branding: window title, About links and Discord RPC now say YuriReader; the update check points at Yuri-Reader releases (Linux asset detection fixed for the tar.gz bundle)
 - "What's new" in About shows Yuri-Reader release notes with a wrapped, collapsible Mangayomi changelog section
