@@ -25,9 +25,9 @@ echo "--- dist/binaries after pkg:"
 ls -la "$ROOT/ts/dist/binaries/" 2>&1 || true
 
 case "$PLATFORM" in
-  linux)   PKG_GLOB="*linux-x64*" ;;
-  windows) PKG_GLOB="*win-x64*" ;;
-  macos)   PKG_GLOB="*macos-x64*" ;;
+  linux)   PKG_GLOB="*linux" ;;
+  windows) PKG_GLOB="*win*" ;;
+  macos)   PKG_GLOB="*macos*" ;;
   *) echo "error: unsupported platform: $PLATFORM" >&2; exit 1 ;;
 esac
 
