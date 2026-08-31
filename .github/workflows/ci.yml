@@ -1,9 +1,10 @@
 name: ci
 
-# Push-triggered build check: verifies the composed app compiles on every
-# push to main. No version bumps, no changelog, no commits, no releases -
-# that is the sync bot's job. This is the fast feedback loop for manual
-# changes (the user bumps versions by hand).
+# Push-triggered build + release: verifies the composed app compiles on every
+# push to main and (re)releases the Linux bundle in place under the current
+# version tag - no version bumps, no changelog, no commits (the user bumps
+# versions by hand; the sync bot handles real upstream syncs). Multiple
+# pushes replace the same tag's asset, so no manual force trigger needed.
 
 on:
   push:
@@ -13,7 +14,7 @@ on:
       - 'README.md'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ci
@@ -75,3 +76,25 @@ jobs:
 
       - name: Build Linux
         run: ./.scripts/build.sh linux
+
+      - name: Package Linux bundle
+        run: |
+          cd .build/app/build/linux/x64/release
+          tar czf "$GITHUB_WORKSPACE/yuri-reader-linux.tar.gz" bundle/
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(grep '^version:' dart/pubspec.yaml | cut -d' ' -f2)"
+          TAG="v${VERSION}"
+          SHA="$(git rev-parse --short HEAD)"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Replace the asset in place; keep existing notes (e.g. the bot's sync line)
+            gh release upload "$TAG" yuri-reader-linux.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" yuri-reader-linux.tar.gz \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Yuri-Reader $TAG" \
+              --notes "Build from $SHA"
+          fi
