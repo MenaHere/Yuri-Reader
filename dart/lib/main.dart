@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:app_links/app_links.dart';
 import 'package:archive/archive.dart';
 import 'package:bot_toast/bot_toast.dart';
@@ -17,27 +18,32 @@ import 'package:isar_community/isar.dart';
 import 'package:yuri_reader/eval/model/m_bridge.dart';
 import 'package:yuri_reader/models/custom_button.dart';
 import 'package:yuri_reader/models/manga.dart';
+import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';
 import 'package:yuri_reader/models/settings.dart';
 import 'package:yuri_reader/models/source.dart';
+import 'package:yuri_reader/repositories/custom_button_repository.dart';
+import 'package:yuri_reader/repositories/track_repository.dart';
 import 'package:yuri_reader/models/track.dart' as track;
-import 'package:yuri_reader/models/track_preference.dart';
 import 'package:yuri_reader/models/track_search.dart';
 import 'package:yuri_reader/modules/manga/detail/providers/track_state_providers.dart';
-import 'package:yuri_reader/modules/manga/reader/providers/crop_borders_provider.dart';
 import 'package:yuri_reader/modules/more/data_and_storage/providers/storage_usage.dart';
 import 'package:yuri_reader/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:yuri_reader/modules/more/settings/general/providers/general_state_provider.dart';
 import 'package:yuri_reader/providers/l10n_providers.dart';
+import 'package:yuri_reader/modules/onboarding/onboarding_screen.dart';
+import 'package:yuri_reader/modules/onboarding/providers/onboarding_state_provider.dart';
 import 'package:yuri_reader/providers/storage_provider.dart';
 import 'package:yuri_reader/router/router.dart';
 import 'package:yuri_reader/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
 import 'package:yuri_reader/l10n/generated/app_localizations.dart';
 import 'package:yuri_reader/services/http/m_client.dart';
-import 'package:yuri_reader/services/isolate_service.dart';
 import 'package:yuri_reader/services/m_extension_server.dart';
 import 'package:yuri_reader/services/download_manager/m_downloader.dart';
 import 'package:yuri_reader/src/rust/frb_generated.dart';
 import 'package:yuri_reader/utils/discord_rpc.dart';
+import 'package:yuri_reader/modules/more/about/widgets/crash_report_banner.dart';
+import 'package:yuri_reader/services/crash_native.dart';
+import 'package:yuri_reader/services/crash_report.dart';
 import 'package:yuri_reader/utils/log/logger.dart';
 import 'package:yuri_reader/utils/platform_utils.dart';
 import 'package:yuri_reader/utils/url_protocol/api.dart';
@@ -49,9 +55,12 @@ import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:path/path.dart' as p;
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show rootBundle, LogicalKeyboardKey;
 import 'package:yuri_reader/utils/window_geometry.dart';
-import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';
+import 'package:yuri_reader/modules/more/settings/general/providers/memory_probe_provider.dart';
+import 'package:yuri_reader/modules/widgets/memory_overlay.dart';
+import 'package:yuri_reader/modules/widgets/app_ui_scale.dart';
+import 'package:yuri_reader/modules/more/settings/appearance/providers/app_ui_scale_state_provider.dart';
 
 late Isar isar;
 DiscordRPC? discordRpc;
@@ -66,11 +75,10 @@ void main(List<String> args) async {
 
       // Cap the decoded image cache so a large library grid can't fill the
       // default 100 MB ceiling with full-resolution covers and OOM constrained
-      // mobile heaps. Mobile gets a tight 64 MB; desktop keeps 256 MB. The
-      // encoded-bytes LRU in CustomExtendedNetworkImageProvider (50 MB) is a
-      // separate cache and is not affected by this setting.
-      PaintingBinding.instance.imageCache.maximumSizeBytes =
-          isMobile ? 64 << 20 : 256 << 20;
+      // mobile heaps. Mobile gets a tight 64 MB; desktop keeps 256 MB.
+      PaintingBinding.instance.imageCache.maximumSizeBytes = isMobile
+          ? 64 << 20
+          : 256 << 20;
 
       // Widget-layer errors (build / layout / paint)
       FlutterError.onError = (FlutterErrorDetails details) {
@@ -78,6 +86,11 @@ void main(List<String> args) async {
         AppLogger.log(
           'FlutterError: ${details.exceptionAsString()}\n${details.stack}',
           logLevel: LogLevel.error,
+        );
+        CrashReports.record(
+          source: 'FlutterError',
+          error: details.exceptionAsString(),
+          stack: details.stack,
         );
       };
 
@@ -87,13 +100,21 @@ void main(List<String> args) async {
           'PlatformDispatcher error: $error\n$stack',
           logLevel: LogLevel.error,
         );
+        CrashReports.record(
+          source: 'PlatformDispatcher',
+          error: error,
+          stack: stack,
+        );
         return true; // handled — prevent app termination
       };
 
       MediaKit.ensureInitialized();
       await RustLib.init();
-      await imgCropIsolate.start();
-      await getIsolateService.start();
+      // Detect Android TV / leanback so the UI can branch on form factor.
+      // No-op on other platforms. See #729.
+      await initIsTv();
+      // Expensive worker isolates start lazily on first use instead of delaying
+      // the first frame.
       if (!isMobile) {
         await windowManager.ensureInitialized();
         await WindowGeometry.restore();
@@ -113,7 +134,25 @@ void main(List<String> args) async {
         }
       }
       final storage = StorageProvider();
-      await storage.requestPermission();
+      // Don't force the Android "all files access" (MANAGE_EXTERNAL_STORAGE)
+      // prompt at launch. The database lives in scoped app storage, so the app
+      // can start, browse and read online without it. The permission is still
+      // requested lazily by `createDirectorySafely` / `initDB` the first time a
+      // public path actually needs to be written (e.g. a download). See #740.
+      // Caught errors are kept for everyone, unlike the verbose log behind
+      // "Enable logs". Anything raised before this is held in memory and
+      // written out here.
+      unawaited(
+        storage
+            .getDefaultDirectory()
+            .then((directory) async {
+              await CrashReports.init(directory);
+              // After CrashReports, because a native crash from the last run
+              // is recorded into it.
+              await NativeCrashHandler.init(directory);
+            })
+            .catchError((_) {}),
+      );
       isar = await storage.initDB(null, inspector: kDebugMode);
       runApp(ProviderScope(child: MyApp(), retry: (retryCount, error) => null));
       unawaited(_postLaunchInit(storage));
@@ -123,12 +162,19 @@ void main(List<String> args) async {
         'runZonedGuarded error: $error\n$stack',
         logLevel: LogLevel.error,
       );
+      CrashReports.record(
+        source: 'runZonedGuarded',
+        error: error,
+        stack: stack,
+      );
     },
   );
 }
 
+
 Future<void> _postLaunchInit(StorageProvider storage) async {
   await AppLogger.init();
+  unawaited(maybeShowCrashBanner());
   unawaited(MDownloader.initializeIsolatePool(poolSize: 6));
   final hivePath = isApple ? "databases" : p.join("Mangayomi", "databases");
   await Hive.initFlutter(Platform.isAndroid ? "" : hivePath);
@@ -138,7 +184,7 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
     await discordRpc?.initialize();
   }
   await storage.deleteBtDirectory();
-  await cfResolutionWebviewServer();
+  await webviewServer();
 
   // Start the Yuri-Sync MALSync bridge in the background.
   unawaited(YuriSyncService().ensureInitialized());
@@ -164,13 +210,24 @@ class _MyAppState extends ConsumerState<MyApp>
     if (!isMobile) windowManager.addListener(this);
     initializeDateFormatting();
     customDns = ref.read(customDnsStateProvider);
-    _checkTrackerRefresh();
     _initDeepLinks();
     _setupMpvConfig();
-    unawaited(ref.read(scanLocalLibraryProvider.future));
+
+    // Tracker refresh and the local-library filesystem scan compete with the
+    // first paint for network/CPU; run them shortly after the UI is up.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(seconds: 2), () {
+        if (!mounted) return;
+        _checkTrackerRefresh();
+        unawaited(ref.read(scanLocalLibraryProvider.future));
+      });
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      MExtensionServerPlatform(ref).startServer();
+      if (!Platform.isIOS ||
+          ref.read(autoStartExtensionServerOnLaunchStateProvider)) {
+        MExtensionServerPlatform(ref).startServer();
+      }
       if (ref.read(clearChapterCacheOnAppLaunchStateProvider)) {
         // Watch before calling clearcache to keep it alive, so that _getTotalDiskSpace completes safely
         ref.watch(totalChapterCacheSizeStateProvider);
@@ -190,7 +247,7 @@ class _MyAppState extends ConsumerState<MyApp>
         return;
       }
       // Lock the app when going to background (if lock is enabled)
-      final lockEnabled = isar.settings.getSync(227)!.appLockEnabled ?? false;
+      final lockEnabled = ref.read(appLockEnabledStateProvider);
       if (lockEnabled) {
         ref.read(appUnlockedStateProvider.notifier).lock();
       }
@@ -216,7 +273,49 @@ class _MyAppState extends ConsumerState<MyApp>
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       builder: (context, child) {
-        final base = BotToastInit()(context, child);
+        Widget content = child ?? const SizedBox.shrink();
+        // First launch of a fresh install: the app has no sources of its own,
+        // so say so before dropping the user into an empty Browse. Gating here
+        // rather than in the router keeps the TV shortcuts, the UI scale and
+        // the toast host below wrapping it exactly as they wrap everything else.
+        // Fading rather than swapping. The first run used to vanish in a
+        // single frame onto whatever the router had underneath it, which is
+        // also the frame the browse branch is still building in, so the end of
+        // the flow was the roughest part of it.
+        final onboarding = !ref.watch(onboardingCompletedStateProvider);
+        content = AnimatedSwitcher(
+          duration: const Duration(milliseconds: 380),
+          // The app fades up over most of the window while the first run
+          // holds, then leaves. Crossing them evenly showed both at half
+          // strength through the middle, which reads as a flicker.
+          switchInCurve: const Interval(0.35, 1, curve: Curves.easeOut),
+          switchOutCurve: const Interval(0, 0.5, curve: Curves.easeIn),
+          child: onboarding
+              ? const OnboardingScreen()
+              : KeyedSubtree(key: const ValueKey('app'), child: content),
+        );
+        // On TV, a single-line text field consumes Up/Down for the text cursor,
+        // trapping focus so the remote can't reach the surrounding buttons (a
+        // dialog's Cancel/Add, etc.). Remap Up/Down to move focus app-wide: a
+        // no-op everywhere except inside a text field, where it frees the field.
+        if (isTv) {
+          content = Shortcuts(
+            shortcuts: const <ShortcutActivator, Intent>{
+              SingleActivator(LogicalKeyboardKey.arrowDown):
+                  DirectionalFocusIntent(TraversalDirection.down),
+              SingleActivator(LogicalKeyboardKey.arrowUp):
+                  DirectionalFocusIntent(TraversalDirection.up),
+            },
+            child: content,
+          );
+        }
+        // Normalize the TV UI to a fixed reference width so it looks consistent
+        // across TVs regardless of the density the device reports. No-op off-TV.
+        final scaledChild = AppUiScale(
+          scale: ref.watch(appUiScaleStateProvider),
+          child: content,
+        );
+        final base = BotToastInit()(context, scaledChild);
         final withBackHandler = !isMobile
             ? _MouseBackButtonHandler(router: router, child: base)
             : base;
@@ -230,6 +329,22 @@ class _MyAppState extends ConsumerState<MyApp>
               children: [withBackHandler, const AppLockScreen()],
             );
           }
+        }
+
+        // Sits above everything, including the lock screen, because a
+        // measurement is not worth taking if navigating away ends it.
+        if (ref.watch(memoryOverlayVisibleProvider)) {
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              withBackHandler,
+              MemoryOverlay(
+                probe: ref.read(memoryProbeProvider),
+                onClose: () =>
+                    ref.read(memoryOverlayVisibleProvider.notifier).set(false),
+              ),
+            ],
+          );
         }
 
         return withBackHandler;
@@ -252,7 +367,7 @@ class _MyAppState extends ConsumerState<MyApp>
     MExtensionServerPlatform(ref).stopServer();
     _linkSubscription?.cancel();
     discordRpc?.destroy();
-    stopCfResolutionWebviewServer();
+    stopwebviewServer();
     AppLogger.dispose();
     super.dispose();
   }
@@ -294,9 +409,9 @@ class _MyAppState extends ConsumerState<MyApp>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("${l10n.name}: ${repoName ?? 'Unknown'}"),
+                    Text(l10n.label_value(l10n.name, repoName ?? l10n.unknown)),
                     const SizedBox(height: 8),
-                    Text("URL: ${repoUrl ?? 'Unknown'}"),
+                    Text(l10n.label_value(l10n.url, repoUrl ?? l10n.unknown)),
                   ],
                 ),
                 actions: [
@@ -387,16 +502,13 @@ class _MyAppState extends ConsumerState<MyApp>
                         child: Text(l10n.add),
                         onPressed: () async {
                           if (context.mounted) Navigator.of(context).pop();
-                          await isar.writeTxn(() async {
-                            await isar.customButtons.put(
-                              customButton
-                                ..pos = await isar.customButtons.count()
-                                ..isFavourite = false
-                                ..id = null
-                                ..updatedAt =
-                                    DateTime.now().millisecondsSinceEpoch,
-                            );
-                          });
+                          final pos = await customButtonRepository.count();
+                          await customButtonRepository.save(
+                            customButton
+                              ..pos = pos
+                              ..isFavourite = false
+                              ..id = null,
+                          );
                           botToast(l10n.custom_buttons_added);
                         },
                       ),
@@ -431,42 +543,52 @@ class _MyAppState extends ConsumerState<MyApp>
   }
 
   Future<void> _setupMpvConfig() async {
-    final provider = StorageProvider();
-    final dir = await provider.getMpvDirectory();
-    final mpvFile = File('${dir!.path}/mpv.conf');
-    final inputFile = File('${dir.path}/input.conf');
-    final filesMissing =
-        !(await mpvFile.exists()) && !(await inputFile.exists());
-    if (filesMissing) {
-      final bytes = await rootBundle.load("assets/mangayomi_mpv.zip");
-      final archive = ZipDecoder().decodeBytes(bytes.buffer.asUint8List());
-      String shadersDir = p.join(dir.path, 'shaders');
-      await Directory(shadersDir).create(recursive: true);
-      String scriptsDir = p.join(dir.path, 'scripts');
-      await Directory(scriptsDir).create(recursive: true);
-      for (final file in archive.files) {
-        if (file.name == "mpv.conf") {
-          await mpvFile.writeAsBytes(file.content);
-        } else if (file.name == "input.conf") {
-          await inputFile.writeAsBytes(file.content);
-        } else if (file.name.startsWith("shaders/") &&
-            file.name.endsWith(".glsl")) {
-          final shaderFile = File('$shadersDir/${file.name.split("/").last}');
-          await shaderFile.writeAsBytes(file.content);
-        } else if (file.name.startsWith("scripts/") &&
-            (file.name.endsWith(".js") || file.name.endsWith(".lua"))) {
-          final scriptFile = File('$scriptsDir/${file.name.split("/").last}');
-          await scriptFile.writeAsBytes(file.content);
+    try {
+      final provider = StorageProvider();
+      final dir = await provider.getMpvDirectory();
+      final mpvFile = File(p.join(dir!.path, 'mpv.conf'));
+      final inputFile = File(p.join(dir.path, 'input.conf'));
+      final filesMissing =
+          !(await mpvFile.exists()) && !(await inputFile.exists());
+      if (filesMissing) {
+        final bytes = await rootBundle.load("assets/mangayomi_mpv.zip");
+        final archive = ZipDecoder().decodeBytes(bytes.buffer.asUint8List());
+        final shadersDir = Directory(p.join(dir.path, 'shaders'));
+        final scriptsDir = Directory(p.join(dir.path, 'scripts'));
+        await Future.wait([
+          shadersDir.create(recursive: true),
+          scriptsDir.create(recursive: true),
+        ]);
+
+        final List<Future> writes = [];
+        for (final file in archive.files) {
+          final name = file.name;
+          if (name == "mpv.conf") {
+            writes.add(mpvFile.writeAsBytes(file.content));
+          } else if (name == "input.conf") {
+            writes.add(inputFile.writeAsBytes(file.content));
+          } else if (name.startsWith("shaders/") && name.endsWith(".glsl")) {
+            final shaderFile = File(p.join(shadersDir.path, p.basename(name)));
+            writes.add(shaderFile.writeAsBytes(file.content));
+          } else if (name.startsWith("scripts/") &&
+              (name.endsWith(".js") || name.endsWith(".lua"))) {
+            final scriptFile = File(p.join(scriptsDir.path, p.basename(name)));
+            writes.add(scriptFile.writeAsBytes(file.content));
+          }
         }
+        await Future.wait(writes);
       }
+    } catch (e) {
+      // Best-effort: on Android the mpv config dir is in shared storage, which
+      // may not be writable until the all-files permission is granted (now
+      // requested lazily, not forced at launch). Skip setup rather than throw;
+      // it's retried on a later launch once the directory is writable. See #740.
+      if (kDebugMode) debugPrint('mpv config setup skipped: $e');
     }
   }
 
   Future<void> _checkTrackerRefresh() async {
-    final prefs = await isar.trackPreferences
-        .filter()
-        .syncIdIsNotNull()
-        .findAll();
+    final prefs = await trackRepository.getAllPreferencesWithSyncId();
     for (final pref in prefs) {
       final temp = track.Track(
         syncId: pref.syncId,
