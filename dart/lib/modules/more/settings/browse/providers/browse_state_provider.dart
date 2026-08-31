@@ -1,11 +1,16 @@
 import 'dart:convert';
-import 'package:http/http.dart';
-import 'package:yuri_reader/main.dart';
+import 'dart:io';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http_interceptor/http_interceptor.dart';
 import 'package:yuri_reader/models/manga.dart';
 import 'package:yuri_reader/models/settings.dart';
 import 'package:yuri_reader/models/source.dart';
+import 'package:yuri_reader/repositories/settings_repository.dart';
 import 'package:yuri_reader/services/fetch_item_sources.dart';
 import 'package:yuri_reader/services/http/m_client.dart';
+import 'package:yuri_reader/services/extension_store_service.dart';
+import 'package:yuri_reader/utils/platform_utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'browse_state_provider.g.dart';
 
@@ -14,31 +19,39 @@ class AndroidProxyServerState extends _$AndroidProxyServerState {
   @override
   String build() {
     String proxyServer =
-        isar.settings.getSync(227)!.androidProxyServer ??
-        "http://127.0.0.1:8080";
+        settingsRepository.current.androidProxyServer ?? "http://127.0.0.1:8080";
     if (!proxyServer.startsWith("http")) {
       proxyServer = "http://$proxyServer";
     }
     if ((proxyServer.contains("localhost") ||
-            RegExp(
-              r'^((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])(\.(?!$)|$)){4}$',
-            ).hasMatch(proxyServer.replaceAll("://", ":").split(":")[1])) &&
+            RegExp(r'^((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])(\.(?!$)|$)){4}$')
+                .hasMatch(proxyServer.replaceAll("://", ":").split(":")[1])) &&
         proxyServer.split(":").length < 3) {
       proxyServer = "$proxyServer:8080";
     }
     return proxyServer;
   }
 
-  Future<void> set(String value) async {
-    final settings = isar.settings.getSync(227);
+  void set(String value) {
     state = value;
-    await isar.writeTxn(() async {
-      await isar.settings.put(
-        settings!
-          ..androidProxyServer = value
-          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-      );
-    });
+    settingsRepository.update((s) => s.androidProxyServer = value);
+  }
+}
+
+@riverpod
+class AutoStartExtensionServerOnLaunchState
+    extends _$AutoStartExtensionServerOnLaunchState {
+  @override
+  bool build() {
+    return settingsRepository.current.autoStartExtensionServerOnLaunch ??
+        false;
+  }
+
+  void set(bool value) {
+    state = value;
+    settingsRepository.update(
+      (s) => s.autoStartExtensionServerOnLaunch = value,
+    );
   }
 }
 
@@ -46,19 +59,12 @@ class AndroidProxyServerState extends _$AndroidProxyServerState {
 class OnlyIncludePinnedSourceState extends _$OnlyIncludePinnedSourceState {
   @override
   bool build() {
-    return isar.settings.getSync(227)!.onlyIncludePinnedSources!;
+    return settingsRepository.current.onlyIncludePinnedSources!;
   }
 
   void set(bool value) {
-    final settings = isar.settings.getSync(227);
     state = value;
-    isar.writeTxnSync(
-      () => isar.settings.putSync(
-        settings!
-          ..onlyIncludePinnedSources = value
-          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-      ),
-    );
+    settingsRepository.update((s) => s.onlyIncludePinnedSources = value);
   }
 }
 
@@ -66,19 +72,12 @@ class OnlyIncludePinnedSourceState extends _$OnlyIncludePinnedSourceState {
 class ShowNSFWState extends _$ShowNSFWState {
   @override
   bool build() {
-    return isar.settings.getSync(227)!.showNSFW ?? false;
+    return settingsRepository.current.showNSFW ?? false;
   }
 
   void set(bool value) {
-    final settings = isar.settings.getSync(227);
     state = value;
-    isar.writeTxnSync(
-      () => isar.settings.putSync(
-        settings!
-          ..showNSFW = value
-          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-      ),
-    );
+    settingsRepository.update((s) => s.showNSFW = value);
   }
 }
 
@@ -86,7 +85,7 @@ class ShowNSFWState extends _$ShowNSFWState {
 class ExtensionsRepoState extends _$ExtensionsRepoState {
   @override
   List<Repo> build(ItemType itemType) {
-    final settings = isar.settings.getSync(227)!;
+    final settings = settingsRepository.current;
     return switch (itemType) {
           ItemType.manga => settings.mangaExtensionsRepo,
           ItemType.anime => settings.animeExtensionsRepo,
@@ -106,27 +105,18 @@ class ExtensionsRepoState extends _$ExtensionsRepoState {
   }
 
   void set(List<Repo> value) {
-    final settings = isar.settings.getSync(227)!;
     state = value;
-    isar.writeTxnSync(() {
-      final a = switch (itemType) {
-        ItemType.manga => isar.settings.putSync(
-          settings
-            ..mangaExtensionsRepo = value
-            ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-        ),
-        ItemType.anime => isar.settings.putSync(
-          settings
-            ..animeExtensionsRepo = value
-            ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-        ),
-        _ => isar.settings.putSync(
-          settings
-            ..novelExtensionsRepo = value
-            ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-        ),
-      };
-      a;
+    settingsRepository.update((s) {
+      switch (itemType) {
+        case ItemType.manga:
+          s.mangaExtensionsRepo = value;
+          break;
+        case ItemType.anime:
+          s.animeExtensionsRepo = value;
+          break;
+        default:
+          s.novelExtensionsRepo = value;
+      }
     });
     try {
       final a = ref.refresh(
@@ -145,19 +135,12 @@ class ExtensionsRepoState extends _$ExtensionsRepoState {
 class AutoUpdateExtensionsState extends _$AutoUpdateExtensionsState {
   @override
   bool build() {
-    return isar.settings.getSync(227)!.autoExtensionsUpdates ?? false;
+    return settingsRepository.current.autoExtensionsUpdates ?? false;
   }
 
   void set(bool value) {
-    final settings = isar.settings.getSync(227);
     state = value;
-    isar.writeTxnSync(
-      () => isar.settings.putSync(
-        settings!
-          ..autoExtensionsUpdates = value
-          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-      ),
-    );
+    settingsRepository.update((s) => s.autoExtensionsUpdates = value);
   }
 }
 
@@ -165,25 +148,29 @@ class AutoUpdateExtensionsState extends _$AutoUpdateExtensionsState {
 class CheckForExtensionsUpdateState extends _$CheckForExtensionsUpdateState {
   @override
   bool build() {
-    return isar.settings.getSync(227)!.checkForExtensionUpdates ?? true;
+    return settingsRepository.current.checkForExtensionUpdates ?? true;
   }
 
   void set(bool value) {
-    final settings = isar.settings.getSync(227);
     state = value;
-    isar.writeTxnSync(
-      () => isar.settings.putSync(
-        settings!
-          ..checkForExtensionUpdates = value
-          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-      ),
-    );
+    settingsRepository.update((s) => s.checkForExtensionUpdates = value);
   }
 }
 
 @riverpod
 Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
   final http = MClient.init(reqcopyWith: {'useDartHttpClient': true});
+
+  if (['/.min.json', '.pb'].any((suffix) => jsonUrl.endsWith(suffix))) {
+    final result = await ExtensionStoreService.fetchStore(jsonUrl, http);
+    if (result != null) {
+      return Repo(
+        name: result.name,
+        website: result.website,
+        jsonUrl: result.indexUrl,
+      );
+    }
+  }
 
   Map<String, dynamic> infos = {};
   final match = RegExp(r'^(.*)/[^/]+\.json$').firstMatch(jsonUrl);
@@ -218,3 +205,21 @@ bool _checkValidUrl(Response res) {
   }
   return true;
 }
+
+final isExtensionServerInstalledStreamProvider = StreamProvider<bool>((
+  ref,
+) async* {
+  if (!isDesktop) {
+    yield true;
+    return;
+  }
+  await for (final settings in settingsRepository.watch()) {
+    final jrePath = settings.jrePath ?? '';
+    final serverPath = settings.extensionServerPath ?? '';
+    if (jrePath.isEmpty || serverPath.isEmpty) {
+      yield false;
+    } else {
+      yield File(jrePath).existsSync() && File(serverPath).existsSync();
+    }
+  }
+});

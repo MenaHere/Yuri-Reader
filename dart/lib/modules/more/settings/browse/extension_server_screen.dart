@@ -7,14 +7,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:yuri_reader/eval/model/m_bridge.dart';
-import 'package:yuri_reader/main.dart';
-import 'package:yuri_reader/models/settings.dart';
 import 'package:yuri_reader/modules/more/settings/browse/extension_server/android_proxy_server_dialog.dart';
 import 'package:yuri_reader/modules/more/settings/browse/extension_server/extension_server_release.dart';
 import 'package:yuri_reader/modules/more/settings/browse/extension_server/extension_server_tiles.dart';
 import 'package:yuri_reader/modules/more/settings/browse/extension_server/extension_server_utils.dart';
 import 'package:yuri_reader/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:yuri_reader/providers/l10n_providers.dart';
+import 'package:yuri_reader/repositories/settings_repository.dart';
 import 'package:yuri_reader/services/fetch_sources_list.dart';
 import 'package:yuri_reader/services/m_extension_server.dart';
 import 'package:yuri_reader/utils/extensions/build_context_extensions.dart';
@@ -46,12 +45,15 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
   String _latestVersion = '';
   String _releaseCheckMessage = '';
   ExtensionServerRelease? _latestRelease;
+  bool _runtimeRunning = false;
+  bool _runtimeBusy = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshStatus();
+      _refreshRuntimeStatus();
     });
   }
 
@@ -61,7 +63,7 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
 
   bool get _showAndroidProxyServerSection => isMobile;
 
-  bool get _showDesktopAdvancedApkBridgeSection => isDesktop;
+  bool get _showDesktopAdvancedMExtensionServerSection => isDesktop;
 
   bool get _isInstalled => _serverExists && (!_requiresJre || _jreExists);
 
@@ -82,6 +84,9 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
   Widget build(BuildContext context) {
     final l10n = l10nLocalizations(context)!;
     final androidProxyServer = ref.watch(androidProxyServerStateProvider);
+    final autoStartServer = ref.watch(
+      autoStartExtensionServerOnLaunchStateProvider,
+    );
     final actionLabel = !_isInstalled
         ? l10n.download
         : (_hasUpdateAvailable ? l10n.update_files : l10n.up_to_date);
@@ -243,7 +248,7 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                l10n.apkbridge_description,
+                l10n.m_extension_server_description,
                 style: TextStyle(color: context.secondaryColor),
               ),
               const SizedBox(height: 12),
@@ -260,8 +265,8 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
                       onPressed: () => showAndroidProxyServerDialog(
                         context,
                         proxyServer: androidProxyServer,
-                        onConfirm: (server) async {
-                          await ref
+                        onConfirm: (server) {
+                          ref
                               .read(androidProxyServerStateProvider.notifier)
                               .set(server);
                         },
@@ -273,20 +278,60 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _openApkBridgeRelease,
+                      onPressed: _openMExtensionServerRelease,
                       icon: const Icon(Icons.download_outlined),
-                      label: Text(l10n.get_apk_bridge),
+                      label: Text(l10n.get_m_extension_server),
                     ),
                   ),
                 ],
               ),
+              if (Platform.isIOS) ...[
+                const SizedBox(height: 24),
+                Text(
+                  l10n.zero_interpreter,
+                  style: TextStyle(fontSize: 13, color: context.primaryColor),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.zero_interpreter_description,
+                  style: TextStyle(color: context.secondaryColor),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l10n.start_server_on_launch),
+                  value: autoStartServer,
+                  onChanged: ref
+                      .read(
+                        autoStartExtensionServerOnLaunchStateProvider.notifier,
+                      )
+                      .set,
+                ),
+                const SizedBox(height: 12),
+                ExtensionServerStatusTile(
+                  label: l10n.runtime_status,
+                  value: _runtimeRunning ? l10n.running : l10n.stopped,
+                  exists: _runtimeRunning,
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _runtimeBusy ? null : _toggleRuntime,
+                    icon: Icon(
+                      _runtimeRunning
+                          ? Icons.stop_circle_outlined
+                          : Icons.play_circle_outline,
+                    ),
+                    label: Text(_runtimeRunning ? l10n.stop : l10n.start),
+                  ),
+                ),
+              ],
             ],
-            if (_showDesktopAdvancedApkBridgeSection) ...[
+            if (_showDesktopAdvancedMExtensionServerSection) ...[
               const SizedBox(height: 24),
               Theme(
-                data: Theme.of(
-                  context,
-                ).copyWith(dividerColor: Colors.transparent),
+                data: Theme.of(context)
+                    .copyWith(dividerColor: Colors.transparent),
                 child: ExpansionTile(
                   tilePadding: EdgeInsets.zero,
                   childrenPadding: const EdgeInsets.only(bottom: 8),
@@ -304,7 +349,7 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      l10n.apkbridge_description,
+                      l10n.m_extension_server_description,
                       style: TextStyle(color: context.secondaryColor),
                     ),
                     const SizedBox(height: 12),
@@ -321,8 +366,8 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
                             onPressed: () => showAndroidProxyServerDialog(
                               context,
                               proxyServer: androidProxyServer,
-                              onConfirm: (server) async {
-                                await ref
+                              onConfirm: (server) {
+                                ref
                                     .read(
                                       androidProxyServerStateProvider.notifier,
                                     )
@@ -336,9 +381,9 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: _openApkBridgeRelease,
+                            onPressed: _openMExtensionServerRelease,
                             icon: const Icon(Icons.download_outlined),
-                            label: Text(l10n.get_apk_bridge),
+                            label: Text(l10n.get_m_extension_server),
                           ),
                         ),
                       ],
@@ -373,6 +418,29 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
       fileState: fileState,
       releaseState: releaseState,
     );
+  }
+
+  Future<void> _refreshRuntimeStatus() async {
+    if (!Platform.isIOS) return;
+    final running = await MExtensionServerPlatform(ref).checkLocalServer();
+    if (mounted) setState(() => _runtimeRunning = running);
+  }
+
+  Future<void> _toggleRuntime() async {
+    setState(() => _runtimeBusy = true);
+    final server = MExtensionServerPlatform(ref);
+    if (_runtimeRunning) {
+      await server.stopServer();
+    } else {
+      await server.startServer(forceLocal: true);
+    }
+    final running = await server.checkLocalServer();
+    if (mounted) {
+      setState(() {
+        _runtimeRunning = running;
+        _runtimeBusy = false;
+      });
+    }
   }
 
   Future<void> _downloadOrUpdate() async {
@@ -495,14 +563,10 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
     required String extensionServerPath,
     required String installDirectory,
   }) async {
-    final settings = isar.settings.getSync(227);
-    isar.writeTxnSync(
-      () => isar.settings.putSync(
-        settings!
-          ..jrePath = jrePath
-          ..extensionServerPath = extensionServerPath
-          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-      ),
+    settingsRepository.update(
+      (s) => s
+        ..jrePath = jrePath
+        ..extensionServerPath = extensionServerPath,
     );
     if (mounted) {
       setState(() {
@@ -542,10 +606,10 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
     }
   }
 
-  Future<void> _openApkBridgeRelease() async {
+  Future<void> _openMExtensionServerRelease() async {
     final l10n = l10nLocalizations(context)!;
     if (!await launchUrl(
-      Uri.parse(apkBridgeReleaseUrl),
+      Uri.parse(mExtensionServerReleaseUrl),
       mode: LaunchMode.externalApplication,
     )) {
       botToast(l10n.could_not_launch_apk_bridge_page);
@@ -577,10 +641,10 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
   }
 
   _ConfiguredPaths _readConfiguredPaths() {
-    final settings = isar.settings.getSync(227);
+    final settings = settingsRepository.current;
     return _ConfiguredPaths(
-      jrePath: settings?.jrePath ?? '',
-      extensionServerPath: settings?.extensionServerPath ?? '',
+      jrePath: settings.jrePath ?? '',
+      extensionServerPath: settings.extensionServerPath ?? '',
     );
   }
 
@@ -818,14 +882,12 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
   }
 
   Future<File?> _pickIosJarFile(dynamic l10n) async {
-    final result = await FilePicker.pickFiles(
+    final file = await FilePicker.pickFile(
       dialogTitle: l10n.select_extension_server_jar,
       type: FileType.custom,
       allowedExtensions: const ['jar'],
-      allowMultiple: false,
-      withData: false,
     );
-    final filePath = result?.files.single.path;
+    final filePath = file?.path;
     if (filePath == null || filePath.isEmpty) {
       return null;
     }
