@@ -73,12 +73,5 @@ jobs:
       - name: Compose
         run: ./.scripts/compose.sh
 
-      - name: Flutter analyze
-        run: |
-          cd .build/app
-          flutter pub get
-          dart pub get --directory=rust_builder/cargokit/build_tool
-          flutter analyze --no-fatal-infos --no-fatal-warnings
-
       - name: Build Linux
         run: ./.scripts/build.sh linux

@@ -121,6 +121,15 @@ jobs:
           flutter-version: 3.41.9   # matches Dart ^3.11.5 in dart/pubspec.yaml
           cache: true
 
+      - name: Flutter analyze
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          ./.scripts/compose.sh
+          cd .build/app
+          flutter pub get
+          dart pub get --directory=rust_builder/cargokit/build_tool
+          flutter analyze --no-fatal-infos --no-fatal-warnings
+
       - name: Compose + build Linux
         if: steps.check.outputs.changed == 'true'
         run: ./.scripts/build.sh linux
