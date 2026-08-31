@@ -177,34 +177,34 @@ class AboutScreen extends ConsumerWidget {
                       //   title: const Text('Privacy policy'),
                       // ),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          IconButton(
-                            onPressed: () {
-                              _launchInBrowser(
-                                Uri.parse(
-                                  'https://github.com/MenaHere/Yuri-Reader',
-                                ),
-                              );
-                            },
-                            icon: const Padding(
-                              padding: EdgeInsets.only(left: 2.5, right: 2.5),
-                              child: FaIcon(FontAwesomeIcons.github),
-                            ),
+                          _LinkWithSubtitle(
+                            icon: FontAwesomeIcons.github,
+                            color: Theme.of(context).brightness ==
+                                    Brightness.light
+                                ? Colors.black
+                                : Colors.white,
+                            subtitle: 'Yuri-Reader',
+                            url: 'https://github.com/MenaHere/Yuri-Reader',
                           ),
-                          IconButton(
-                            onPressed: () {
-                              _launchInBrowser(
-                                Uri.parse(
-                                  'https://discord.com/invite/EjfBuYahsP',
-                                ),
-                              );
-                            },
-                            tooltip: 'Mangayomi community Discord',
-                            icon: const Padding(
-                              padding: EdgeInsets.only(right: 5),
-                              child: FaIcon(FontAwesomeIcons.discord),
-                            ),
+                          _LinkWithSubtitle(
+                            icon: FontAwesomeIcons.github,
+                            color: Colors.green,
+                            subtitle: 'Mangayomi',
+                            url: 'https://github.com/kodjodevf/mangayomi',
+                          ),
+                          _LinkWithSubtitle(
+                            icon: FontAwesomeIcons.github,
+                            color: Colors.blue,
+                            subtitle: 'MALSync',
+                            url: 'https://github.com/MALSync/MALSync',
+                          ),
+                          _LinkWithSubtitle(
+                            icon: FontAwesomeIcons.discord,
+                            color: const Color(0xFF5865F2),
+                            subtitle: 'Mangayomi community',
+                            url: 'https://discord.com/invite/EjfBuYahsP',
                           ),
                         ],
                       ),
@@ -223,5 +223,38 @@ class AboutScreen extends ConsumerWidget {
 Future<void> _launchInBrowser(Uri url) async {
   if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
     throw 'Could not launch $url';
+  }
+}
+
+
+/// A link icon with a small centered subtitle underneath.
+class _LinkWithSubtitle extends StatelessWidget {
+  final IconData icon;
+  final Color? color;
+  final String subtitle;
+  final String url;
+  const _LinkWithSubtitle({
+    required this.icon,
+    this.color,
+    required this.subtitle,
+    required this.url,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          onPressed: () => _launchInBrowser(Uri.parse(url)),
+          icon: FaIcon(icon, color: color),
+        ),
+        Text(
+          subtitle,
+          style: const TextStyle(fontSize: 10),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
   }
 }
