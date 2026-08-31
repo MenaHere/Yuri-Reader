@@ -3,27 +3,27 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:isar_community/isar.dart';
-import 'package:mangayomi/eval/model/source_preference.dart';
-import 'package:mangayomi/models/category.dart';
-import 'package:mangayomi/repositories/settings_repository.dart';
-import 'package:mangayomi/models/changed.dart';
-import 'package:mangayomi/models/chapter.dart';
-import 'package:mangayomi/models/custom_button.dart';
-import 'package:mangayomi/models/download.dart';
-import 'package:mangayomi/models/update.dart';
-import 'package:mangayomi/models/history.dart';
-import 'package:mangayomi/models/manga.dart';
-import 'package:mangayomi/models/backup_password_fallback.dart';
-import 'package:mangayomi/models/settings.dart';
-import 'package:mangayomi/models/source.dart';
-import 'package:mangayomi/models/sync_preference.dart';
-import 'package:mangayomi/models/track.dart';
-import 'package:mangayomi/models/track_preference.dart';
-import 'package:mangayomi/utils/extensions/string_extensions.dart';
+import 'package:yuri_reader/eval/model/source_preference.dart';
+import 'package:yuri_reader/models/category.dart';
+import 'package:yuri_reader/repositories/settings_repository.dart';
+import 'package:yuri_reader/models/changed.dart';
+import 'package:yuri_reader/models/chapter.dart';
+import 'package:yuri_reader/models/custom_button.dart';
+import 'package:yuri_reader/models/download.dart';
+import 'package:yuri_reader/models/update.dart';
+import 'package:yuri_reader/models/history.dart';
+import 'package:yuri_reader/models/manga.dart';
+import 'package:yuri_reader/models/backup_password_fallback.dart';
+import 'package:yuri_reader/models/settings.dart';
+import 'package:yuri_reader/models/source.dart';
+import 'package:yuri_reader/models/sync_preference.dart';
+import 'package:yuri_reader/models/track.dart';
+import 'package:yuri_reader/models/track_preference.dart';
+import 'package:yuri_reader/utils/extensions/string_extensions.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as path;
-import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:yuri_reader/utils/platform_utils.dart';
 
 class StorageProvider {
 

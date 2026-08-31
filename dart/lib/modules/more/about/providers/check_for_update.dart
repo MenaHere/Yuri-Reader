@@ -3,11 +3,11 @@ import 'dart:developer';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:mangayomi/repositories/settings_repository.dart';
-import 'package:mangayomi/services/fetch_sources_list.dart';
-import 'package:mangayomi/services/http/m_client.dart';
-import 'package:mangayomi/utils/extensions/string_extensions.dart';
-import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:yuri_reader/repositories/settings_repository.dart';
+import 'package:yuri_reader/services/fetch_sources_list.dart';
+import 'package:yuri_reader/services/http/m_client.dart';
+import 'package:yuri_reader/utils/extensions/string_extensions.dart';
+import 'package:yuri_reader/utils/platform_utils.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'check_for_update.g.dart';
