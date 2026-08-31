@@ -2,6 +2,14 @@
 
 ## Version 0.1.0
 
+### [2026-08-31]
+
+#### Added
+- The sync bot now syncs `dart/pubspec.yaml` dependencies from the mangayomi submodule, so upstream dep bumps and new deps flow into the fork automatically
+
+#### Fixed
+- Sync bot force mode: the submodule bump step no longer runs with empty SHAs (would fail the run)
+
 ### [2026-08-30]
 
 #### Changed
