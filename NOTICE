@@ -8,10 +8,6 @@ LICENSE-GPL-3.0).
 
 GPL-3.0 components:
 
-- dart/assets/trackers_icons/tracker_malsync.webp
-  The MALSync logo, (c) MALSync contributors, from
-  https://github.com/MALSync/MALSync (GPL-3.0).
-
 - ts/vendor/malsync/
   The MALSync extension source, (c) MALSync contributors, from
   https://github.com/MALSync/MALSync (GPL-3.0).
