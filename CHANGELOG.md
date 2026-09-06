@@ -2,11 +2,6 @@
 
 ## Version 0.2.1
 
-### [2026-09-06]
-
-#### Fixed
-- Linux rendering: the app now renders with Skia instead of Impeller. Impeller's OpenGLES backend paints the content area black on software GL (llvmpipe), which is what headless test environments and GPU-less machines use; Skia renders correctly there and is the battle-tested renderer for a reader app
-
 ### [2026-08-31]
 
 #### Changed
