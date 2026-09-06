@@ -1,5 +1,12 @@
 # Yuri-Reader - Change Log
 
+## Version 0.2.2
+
+### [2026-09-06]
+
+#### Changed
+- Linux rendering restored to Impeller (the interim Skia override from the 0.2.1 build was reverted; the black-content issue was an environment problem, not the renderer)
+
 ## Version 0.2.1
 
 ### [2026-08-31]
