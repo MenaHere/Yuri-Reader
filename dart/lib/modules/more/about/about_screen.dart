@@ -229,7 +229,7 @@ Future<void> _launchInBrowser(Uri url) async {
 
 /// A link icon with a small centered subtitle underneath.
 class _LinkWithSubtitle extends StatelessWidget {
-  final IconData icon;
+  final FaIconData icon;
   final Color? color;
   final String subtitle;
   final String url;
