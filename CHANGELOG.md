@@ -1,11 +1,15 @@
 # Yuri-Reader - Change Log
 
-## Unreleased
+## Version 0.2.8
 
 ### [2026-09-20]
 
 #### Bot
 - Synced 151 commits from [mangayomi](https://github.com/kodjodevf/mangayomi), 107 commits from [malsync](https://github.com/MALSync/MALSync)
+
+#### Fixed
+- Ported the fork overlay to mangayomi v0.9.6 (upstream advanced 151 commits from v0.9.2). Of the 25 overlaid files, 13 had also changed upstream: 5 merged by themselves, 8 needed a hand merge. The two largest (`utils/constant.dart` and `browse/settings/providers/browse_state_provider.dart`) merged cleanly and restore the definitions upstream's code expects (`appIconAssets`, `transparentAsset`, `developerModeStateProvider`, `ShowNavDoubleTapTooltipState`) - the weekly sync had been failing on exactly those
+- The reader follows upstream's new list API: the fork's `scrollable_positioned_list` import is gone (upstream dropped the package), along with a stale `crash_report_banner` import whose only caller upstream's rewrite had already removed
 
 ## Version 0.2.7
 
