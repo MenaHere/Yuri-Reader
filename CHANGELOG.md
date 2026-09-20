@@ -1,5 +1,13 @@
 # Yuri-Reader - Change Log
 
+## Version 0.2.5
+
+### [2026-09-20]
+
+#### Changed
+- The sync bot commits the upstream sync whether or not the build works. A failed sync now leaves `main` on the new upstream, so the code can be fixed against it: the changelog gets a `## Unreleased` section and the version is left alone, and the next green run turns that section into the released version. A green sync still bumps the version and releases, as before
+- Bot commits carry GitHub's skip marker, and `ci.yml` skips commits authored by `github-actions[bot]`, so `ci` builds human pushes only. It had been rebuilding the version the bot had just released and replacing that release's bundle with its own build
+
 ## Version 0.2.4
 
 ### [2026-09-20]
