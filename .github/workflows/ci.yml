@@ -1,10 +1,11 @@
 name: ci
 
 # Push-triggered build + release: verifies the composed app compiles on every
-# push to main and (re)releases the Linux bundle in place under the current
-# version tag - no version bumps, no changelog, no commits (the user bumps
-# versions by hand; the sync bot handles real upstream syncs). Multiple
+# human push to main and (re)releases the Linux bundle in place under the
+# current version tag - no version bumps, no changelog, no commits (the user
+# bumps versions by hand; the sync bot handles real upstream syncs). Multiple
 # pushes replace the same tag's asset, so no manual force trigger needed.
+# Bot sync commits are skipped (see the job condition below).
 
 on:
   push:
@@ -22,6 +23,12 @@ concurrency:
 
 jobs:
   build-linux:
+    # Bot sync commits are already built here, and released when green, by
+    # upstream-sync. Rebuilding them would spend a second run and replace that
+    # release's asset with this build instead. The [skip ci] marker in the bot's
+    # commit message already stops this workflow from being triggered at all;
+    # this check also covers a push made without the marker.
+    if: ${{ github.event.head_commit.author.name != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
