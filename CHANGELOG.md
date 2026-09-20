@@ -1,5 +1,19 @@
 # Yuri-Reader - Change Log
 
+## Unreleased
+
+### [2026-09-20]
+
+#### Bot
+- Synced 151 commits from [mangayomi](https://github.com/kodjodevf/mangayomi), 107 commits from [malsync](https://github.com/MALSync/MALSync)
+
+## Version 0.2.7
+
+### [2026-09-20]
+
+#### Fixed
+- The sync bot writes its changelog entry again. The released/unreleased decision was computed inside a command, where it silently evaluated to nothing, so the failed sync committed the upstream bump and the synced pubspec but no `## Unreleased` entry. It now uses the step status functions in the step conditions, the only place they are valid
+
 ## Version 0.2.6
 
 ### [2026-09-20]
