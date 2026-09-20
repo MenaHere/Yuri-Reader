@@ -111,14 +111,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /opt/hostedtoolcache/flutter
-          key: flutter-3.47.2-${{ runner.os }}
+          key: flutter-3.47.5-${{ runner.os }}
 
       - name: Install Flutter
         if: steps.check.outputs.changed == 'true'
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: 3.47.2   # matches Dart ^3.13.1 in dart/pubspec.yaml
+          flutter-version: 3.47.5   # Dart 3.13.4; must satisfy dart/pubspec.yaml's sdk constraint (^3.13.3)
           cache: true
 
       - name: Flutter analyze
