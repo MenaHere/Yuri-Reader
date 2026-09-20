@@ -1,10 +1,11 @@
 name: ci
 
 # Push-triggered build + release: verifies the composed app compiles on every
-# human push to main and (re)releases the Linux bundle in place under the
-# current version tag - no version bumps, no changelog, no commits (the user
-# bumps versions by hand; the sync bot handles real upstream syncs). Multiple
-# pushes replace the same tag's asset, so no manual force trigger needed.
+# human push to main and releases the Linux bundle under the current version
+# tag - no version bumps, no changelog, no commits (the user bumps versions by
+# hand; the sync bot handles real upstream syncs). Releases are create-only: a
+# version's release is written once, and a push whose tag already has one still
+# builds but does not touch the release.
 # Bot sync commits are skipped (see the job condition below).
 
 on:
@@ -82,19 +83,17 @@ jobs:
           cd .build/app/build/linux/x64/release
           tar czf "$GITHUB_WORKSPACE/yuri-reader-linux.tar.gz" bundle/
 
-      - name: Create or update release
+      - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="$(grep '^version:' dart/pubspec.yaml | cut -d' ' -f2)"
           TAG="v${VERSION}"
-          SHA="$(git rev-parse --short HEAD)"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            # Replace the asset in place; keep existing notes (e.g. the bot's sync line)
-            gh release upload "$TAG" yuri-reader-linux.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
-          else
-            gh release create "$TAG" yuri-reader-linux.tar.gz \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "Yuri-Reader $TAG" \
-              --notes "Build from $SHA"
+            echo "release $TAG already exists - refusing to rewrite it"
+            exit 0
           fi
+          gh release create "$TAG" yuri-reader-linux.tar.gz \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Yuri-Reader $TAG" \
+            --notes "Build from $(git rev-parse --short HEAD)"

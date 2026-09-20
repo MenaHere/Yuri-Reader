@@ -5,6 +5,11 @@ name: upstream-sync
 # - No upstream updates (and not forced) -> run succeeds silently.
 # - Sync + build green -> BotYYYYMMDDnnn commit (submodule bumps + version
 #   bump + changelog entry) and a GitHub Release (tag v<version>).
+# - Releases are create-only: if the tag already has a release, the run refuses
+#   to rewrite it. A change that deserves a release gets a new version.
+# - Sync + build red -> the same commit without a version bump, the changelog
+#   entry marked `## Unreleased`, and no release. The sync still lands on main
+#   so the code can be fixed against the new upstream.
 # - Anything breaks -> run fails, which is the only notification you get.
 
 on:
@@ -13,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: 'Build + release even without upstream updates'
+        description: 'Build even without upstream updates (the release is still create-only)'
         type: boolean
         default: false
 
@@ -223,21 +228,18 @@ jobs:
         if: always() && steps.check.outputs.real == 'true'
         run: git push
 
-      - name: Create or update release
+      - name: Create release
         if: success() && steps.check.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="$(grep '^version:' dart/pubspec.yaml | cut -d' ' -f2)"
           TAG="v${VERSION}"
-          NOTES="Sync mangayomi @ ${{ steps.check.outputs.mangayomi }} + malsync @ ${{ steps.check.outputs.malsync }}"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            # Force rebuild: update the existing release in place
-            gh release upload "$TAG" yuri-reader-linux.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
-            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$NOTES"
-          else
-            gh release create "$TAG" yuri-reader-linux.tar.gz \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "Yuri-Reader $TAG" \
-              --notes "$NOTES"
+            echo "release $TAG already exists - refusing to rewrite it"
+            exit 0
           fi
+          gh release create "$TAG" yuri-reader-linux.tar.gz \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Yuri-Reader $TAG" \
+            --notes "Sync mangayomi @ ${{ steps.check.outputs.mangayomi }} + malsync @ ${{ steps.check.outputs.malsync }}"

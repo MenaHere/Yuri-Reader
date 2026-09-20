@@ -1,5 +1,12 @@
 # Yuri-Reader - Change Log
 
+## Version 0.2.6
+
+### [2026-09-20]
+
+#### Changed
+- Releases are create-only in both workflows: when the version's tag already has a release, the run refuses and leaves it alone instead of replacing the bundle and the notes. A change that deserves a release gets a new version; an existing release is never rewritten
+
 ## Version 0.2.5
 
 ### [2026-09-20]
