@@ -6,8 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:yuri_reader/repositories/settings_repository.dart';
 import 'package:yuri_reader/services/fetch_sources_list.dart';
 import 'package:yuri_reader/services/http/m_client.dart';
-import 'package:yuri_reader/utils/extensions/string_extensions.dart';
 import 'package:yuri_reader/utils/platform_utils.dart';
+import 'package:yuri_reader/utils/extensions/string_extensions.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'check_for_update.g.dart';
@@ -56,6 +56,9 @@ Future<UpdateInfo?> _getUpdateIfAvailable() async {
     log(info.data.toString());
   }
   final latest = await _fetchLatestRelease();
+  if (latest == null) {
+    return null;
+  }
   if (compareVersions(info.version, latest.$1) >= 0) {
     return null;
   }
@@ -79,21 +82,22 @@ bool _hasPlatformAssets(List<dynamic> assets) {
   if (Platform.isAndroid) {
     if (isTv) {
       return assetUrls.any(
-            (url) => url.endsWith('.apk') && url.contains('android-tv'),
-          ) ||
-          assetUrls.any((url) => url.endsWith('.apk'));
+        (url) => url.endsWith('.apk') && url.contains('android-tv'),
+      );
     }
     return assetUrls.any(
-          (url) => url.endsWith('.apk') && !url.contains('android-tv'),
-        ) ||
-        assetUrls.any((url) => url.endsWith('.apk'));
+      (url) => url.endsWith('.apk') && !url.contains('android-tv'),
+    );
   } else if (Platform.isIOS) {
-    return assetUrls.any((url) => url.endsWith('-ios.ipa'));
+    return assetUrls.any((url) => url.endsWith('.ipa'));
   } else if (Platform.isMacOS) {
-    return assetUrls.any((url) => url.endsWith('-macos.dmg'));
+    return assetUrls.any((url) => url.endsWith('.dmg') || url.endsWith('.pkg'));
   } else if (Platform.isWindows) {
     return assetUrls.any(
-      (url) => url.endsWith('-windows.exe') || url.endsWith('-windows.zip'),
+      (url) =>
+          url.endsWith('.exe') ||
+          url.endsWith('.msix') ||
+          (url.endsWith('.zip') && url.contains('windows')),
     );
   } else if (Platform.isLinux) {
     return assetUrls.any((url) => url.endsWith('-linux.tar.gz'));

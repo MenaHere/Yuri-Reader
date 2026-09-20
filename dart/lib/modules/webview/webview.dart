@@ -48,12 +48,24 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
     if (Platform.isLinux) {
       _desktopWebview?.close();
     } else {
-      if (browser != null) {
-        if (browser!.isOpened()) browser!.close();
-        browser!.dispose();
-      }
+      _closeBrowser();
     }
     super.dispose();
+  }
+
+  bool _browserClosed = false;
+
+  /// Closes and disposes the Windows in-app browser at most once. It can be
+  /// asked to close from three places for one teardown (the in-app close
+  /// button, the native window's own close via onExit, and dispose()) —
+  /// disposing twice crashes with "used after being disposed".
+  void _closeBrowser() {
+    if (_browserClosed) return;
+    _browserClosed = true;
+    if (browser != null && browser!.isOpened()) {
+      browser!.close();
+    }
+    browser?.dispose();
   }
 
   Webview? _desktopWebview;
@@ -108,6 +120,13 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
               _canGoForward = canGoForward ?? false;
             });
           }
+        },
+        onExitCallback: () {
+          // The native window has already torn itself down; mark it closed so
+          // dispose() and the in-app close button don't try to close/dispose
+          // it again, then pop this route once.
+          _browserClosed = true;
+          if (mounted) Navigator.pop(context);
         },
       );
       await browser!.openUrlRequest(
@@ -193,10 +212,7 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
                               leading: IconButton(
                                 onPressed: () {
                                   if (Platform.isWindows) {
-                                    if (browser!.isOpened()) {
-                                      browser!.close();
-                                      browser!.dispose();
-                                    }
+                                    _closeBrowser();
                                   }
                                   Navigator.pop(context);
                                 },
@@ -365,10 +381,12 @@ class MyInAppBrowser extends InAppBrowser {
   BuildContext context;
   void Function(InAppWebViewController) controller;
   void Function(int) onProgress;
+  void Function() onExitCallback;
   MyInAppBrowser({
     required this.context,
     required this.controller,
     required this.onProgress,
+    required this.onExitCallback,
   }) : super(webViewEnvironment: webViewEnvironment);
 
   @override
@@ -383,7 +401,7 @@ class MyInAppBrowser extends InAppBrowser {
 
   @override
   void onExit() {
-    Navigator.pop(context);
+    onExitCallback.call();
   }
 
   @override

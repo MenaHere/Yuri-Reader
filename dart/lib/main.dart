@@ -18,7 +18,6 @@ import 'package:isar_community/isar.dart';
 import 'package:yuri_reader/eval/model/m_bridge.dart';
 import 'package:yuri_reader/models/custom_button.dart';
 import 'package:yuri_reader/models/manga.dart';
-import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';
 import 'package:yuri_reader/models/settings.dart';
 import 'package:yuri_reader/models/source.dart';
 import 'package:yuri_reader/repositories/custom_button_repository.dart';
@@ -36,21 +35,24 @@ import 'package:yuri_reader/providers/storage_provider.dart';
 import 'package:yuri_reader/router/router.dart';
 import 'package:yuri_reader/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
 import 'package:yuri_reader/l10n/generated/app_localizations.dart';
+import 'package:yuri_reader/services/library_updater.dart';
+import 'package:yuri_reader/services/sync_server.dart';
 import 'package:yuri_reader/services/http/m_client.dart';
 import 'package:yuri_reader/services/m_extension_server.dart';
 import 'package:yuri_reader/services/download_manager/m_downloader.dart';
 import 'package:yuri_reader/src/rust/frb_generated.dart';
 import 'package:yuri_reader/utils/discord_rpc.dart';
-import 'package:yuri_reader/modules/more/about/widgets/crash_report_banner.dart';
 import 'package:yuri_reader/services/crash_native.dart';
 import 'package:yuri_reader/services/crash_report.dart';
 import 'package:yuri_reader/utils/log/logger.dart';
+import 'package:yuri_reader/utils/client_id.dart';
 import 'package:yuri_reader/utils/platform_utils.dart';
 import 'package:yuri_reader/utils/url_protocol/api.dart';
 import 'package:yuri_reader/modules/more/settings/appearance/providers/theme_provider.dart';
 import 'package:yuri_reader/modules/library/providers/file_scanner.dart';
 import 'package:yuri_reader/modules/more/settings/security/providers/security_state_provider.dart';
 import 'package:yuri_reader/modules/more/settings/security/app_lock_screen.dart';
+import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:window_manager/window_manager.dart';
@@ -122,17 +124,6 @@ void main(List<String> args) async {
       if (Platform.isWindows) {
         registerProtocolHandler("mangayomi");
       }
-      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
-        final availableVersion = await WebViewEnvironment.getAvailableVersion();
-        if (availableVersion != null) {
-          final document = await getApplicationDocumentsDirectory();
-          webViewEnvironment = await WebViewEnvironment.create(
-            settings: WebViewEnvironmentSettings(
-              userDataFolder: p.join(document.path, 'flutter_inappwebview'),
-            ),
-          );
-        }
-      }
       final storage = StorageProvider();
       // Don't force the Android "all files access" (MANAGE_EXTERNAL_STORAGE)
       // prompt at launch. The database lives in scoped app storage, so the app
@@ -174,7 +165,10 @@ void main(List<String> args) async {
 
 Future<void> _postLaunchInit(StorageProvider storage) async {
   await AppLogger.init();
-  unawaited(maybeShowCrashBanner());
+  // Backfills clientId on rows saved before that field existed. Runs on every
+  // launch rather than gating on a version check - once caught up it's just
+  // six empty indexed lookups, so there's no real cost to checking again.
+  unawaited(backfillMissingClientIds());
   unawaited(MDownloader.initializeIsolatePool(poolSize: 6));
   final docs = await getApplicationDocumentsDirectory();
   final hivePath = isApple
@@ -191,6 +185,23 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
 
   // Start the Yuri-Sync MALSync bridge in the background.
   unawaited(YuriSyncService().ensureInitialized());
+
+  // Deferred until after runApp() creates the window: on Windows,
+  // WebViewEnvironment.create() needs COM initialized on a thread with an
+  // active message pump, which doesn't exist yet during main()'s pre-launch
+  // setup. Running it here (post-first-frame territory) avoids the
+  // "CoInitialize has not been called" PlatformException.
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+    final availableVersion = await WebViewEnvironment.getAvailableVersion();
+    if (availableVersion != null) {
+      final document = await getApplicationDocumentsDirectory();
+      webViewEnvironment = await WebViewEnvironment.create(
+        settings: WebViewEnvironmentSettings(
+          userDataFolder: p.join(document.path, 'flutter_inappwebview'),
+        ),
+      );
+    }
+  }
 }
 
 class MyApp extends ConsumerStatefulWidget {
@@ -226,6 +237,16 @@ class _MyAppState extends ConsumerState<MyApp>
       });
     });
 
+    // The scheduled library refresh and auto-sync, when due. They go last and
+    // stay quiet: launch is already busy, and these walk data or hit network.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(seconds: 5), () {
+        if (!mounted) return;
+        unawaited(autoUpdateLibraryIfDue(ref));
+        unawaited(autoSyncIfDue(ref));
+      });
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!Platform.isIOS ||
           ref.read(autoStartExtensionServerOnLaunchStateProvider)) {
@@ -254,6 +275,13 @@ class _MyAppState extends ConsumerState<MyApp>
       if (lockEnabled) {
         ref.read(appUnlockedStateProvider.notifier).lock();
       }
+    } else if (state == AppLifecycleState.resumed) {
+      // Launch is the other trigger for the scheduled refresh, so without this
+      // a session that stays open for days - a desktop one, typically - would
+      // never run one. The interval check makes this a no-op the rest of the
+      // time.
+      unawaited(autoUpdateLibraryIfDue(ref));
+      unawaited(autoSyncIfDue(ref));
     }
   }
 
@@ -438,29 +466,49 @@ class _MyAppState extends ConsumerState<MyApp>
                         return;
                       }
 
-                      void addRepos(ItemType type, List<String>? urls) {
+                      Future<void> addRepos(
+                        ItemType type,
+                        List<String>? urls,
+                      ) async {
                         if (urls == null) return;
                         final current = ref.read(
                           extensionsRepoStateProvider(type),
                         );
-                        final updated = [
-                          ...current,
-                          ...urls.map(
-                            (e) => Repo(
-                              name: repoName,
-                              jsonUrl: e,
-                              website: repoUrl,
-                            ),
-                          ),
-                        ];
-                        ref
+                        final existingUrls = current
+                            .map((r) => r.jsonUrl?.trim().toLowerCase())
+                            .whereType<String>()
+                            .toSet();
+                        final newRepos = urls
+                            .where((e) {
+                              final clean = e.trim().toLowerCase();
+                              return !existingUrls.contains(clean) &&
+                                  !existingUrls.contains('$clean/') &&
+                                  !existingUrls.contains(
+                                    clean.endsWith('/')
+                                        ? clean.substring(0, clean.length - 1)
+                                        : clean,
+                                  );
+                            })
+                            .map(
+                              (e) => Repo(
+                                name: repoName,
+                                jsonUrl: e,
+                                website: repoUrl,
+                              ),
+                            )
+                            .toList();
+                        if (newRepos.isEmpty) return;
+                        final updated = [...current, ...newRepos];
+                        await ref
                             .read(extensionsRepoStateProvider(type).notifier)
                             .set(updated);
                       }
 
-                      addRepos(ItemType.manga, mangaRepoUrls);
-                      addRepos(ItemType.anime, animeRepoUrls);
-                      addRepos(ItemType.novel, novelRepoUrls);
+                      await Future.wait([
+                        addRepos(ItemType.manga, mangaRepoUrls),
+                        addRepos(ItemType.anime, animeRepoUrls),
+                        addRepos(ItemType.novel, novelRepoUrls),
+                      ]);
                       botToast(l10n.repo_added);
                     },
                   ),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -19,7 +20,8 @@ class AndroidProxyServerState extends _$AndroidProxyServerState {
   @override
   String build() {
     String proxyServer =
-        settingsRepository.current.androidProxyServer ?? "http://127.0.0.1:8080";
+        settingsRepository.currentOrNull?.androidProxyServer ??
+        "http://127.0.0.1:8080";
     if (!proxyServer.startsWith("http")) {
       proxyServer = "http://$proxyServer";
     }
@@ -43,7 +45,7 @@ class AutoStartExtensionServerOnLaunchState
     extends _$AutoStartExtensionServerOnLaunchState {
   @override
   bool build() {
-    return settingsRepository.current.autoStartExtensionServerOnLaunch ??
+    return settingsRepository.currentOrNull?.autoStartExtensionServerOnLaunch ??
         false;
   }
 
@@ -52,6 +54,22 @@ class AutoStartExtensionServerOnLaunchState
     settingsRepository.update(
       (s) => s.autoStartExtensionServerOnLaunch = value,
     );
+  }
+}
+
+final developerModeStateProvider = NotifierProvider<DeveloperModeState, bool>(
+  DeveloperModeState.new,
+);
+
+class DeveloperModeState extends Notifier<bool> {
+  @override
+  bool build() {
+    return settingsRepository.currentOrNull?.developerMode ?? false;
+  }
+
+  void set(bool value) {
+    state = value;
+    settingsRepository.update((s) => s.developerMode = value);
   }
 }
 
@@ -82,16 +100,56 @@ class ShowNSFWState extends _$ShowNSFWState {
 }
 
 @riverpod
+class ShowNavDoubleTapTooltipState extends _$ShowNavDoubleTapTooltipState {
+  @override
+  bool build() {
+    return settingsRepository.current.showNavDoubleTapTooltip ?? true;
+  }
+
+  void set(bool value) {
+    state = value;
+    settingsRepository.update((s) => s.showNavDoubleTapTooltip = value);
+  }
+}
+
+@riverpod
 class ExtensionsRepoState extends _$ExtensionsRepoState {
+  static List<Repo> _deduplicate(List<Repo> repos) {
+    final seen = <String>{};
+    final result = <Repo>[];
+    for (final repo in repos) {
+      final key = repo.jsonUrl?.trim().toLowerCase();
+      if (key != null && key.isNotEmpty) {
+        if (seen.add(key)) {
+          result.add(repo);
+        }
+      } else {
+        result.add(repo);
+      }
+    }
+    return result;
+  }
+
   @override
   List<Repo> build(ItemType itemType) {
     final settings = settingsRepository.current;
-    return switch (itemType) {
+    final list =
+        switch (itemType) {
           ItemType.manga => settings.mangaExtensionsRepo,
           ItemType.anime => settings.animeExtensionsRepo,
           _ => settings.novelExtensionsRepo,
         } ??
         [];
+    return _deduplicate(list);
+  }
+
+  bool containsRepo(String url) {
+    final clean = url.trim().toLowerCase();
+    return state.any((r) {
+      final rUrl = r.jsonUrl?.trim().toLowerCase();
+      if (rUrl == null) return false;
+      return rUrl == clean || rUrl == '$clean/' || '$rUrl/' == clean;
+    });
   }
 
   void setVisibility(Repo repo, bool hidden) {
@@ -101,32 +159,37 @@ class ExtensionsRepoState extends _$ExtensionsRepoState {
       }
       return e;
     }).toList();
-    set(value);
+    unawaited(set(value));
   }
 
-  void set(List<Repo> value) {
-    state = value;
-    settingsRepository.update((s) {
+  Future<void> set(List<Repo> value) async {
+    final deduplicated = _deduplicate(value);
+    state = deduplicated;
+    await settingsRepository.update((s) {
       switch (itemType) {
         case ItemType.manga:
-          s.mangaExtensionsRepo = value;
+          s.mangaExtensionsRepo = deduplicated;
           break;
         case ItemType.anime:
-          s.animeExtensionsRepo = value;
+          s.animeExtensionsRepo = deduplicated;
           break;
         default:
-          s.novelExtensionsRepo = value;
+          s.novelExtensionsRepo = deduplicated;
       }
     });
+    unawaited(_refreshSources());
+  }
+
+  Future<void> _refreshSources() async {
     try {
-      final a = ref.refresh(
+      final refresh = ref.refresh(
         fetchItemSourcesListProvider(
           id: null,
-          reFresh: false,
+          reFresh: true,
           itemType: itemType,
         ).future,
       );
-      Future.wait([a]);
+      await refresh;
     } catch (_) {}
   }
 }
@@ -160,50 +223,117 @@ class CheckForExtensionsUpdateState extends _$CheckForExtensionsUpdateState {
 @riverpod
 Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
   final http = MClient.init(reqcopyWith: {'useDartHttpClient': true});
+  final cleanUrl = jsonUrl.trim();
 
-  if (['/.min.json', '.pb'].any((suffix) => jsonUrl.endsWith(suffix))) {
-    final result = await ExtensionStoreService.fetchStore(jsonUrl, http);
-    if (result != null) {
-      return Repo(
-        name: result.name,
-        website: result.website,
-        jsonUrl: result.indexUrl,
-      );
-    }
+  // Normalize URLs that don't end with a file name (e.g. https://aidoku-community.github.io/sources)
+  final urlsToTry = <String>[cleanUrl];
+  if (!cleanUrl.endsWith('.json') && !cleanUrl.endsWith('.pb')) {
+    final normalized = cleanUrl.endsWith('/')
+        ? cleanUrl.substring(0, cleanUrl.length - 1)
+        : cleanUrl;
+    urlsToTry.addAll([
+      '$normalized/index.min.json',
+      '$normalized/repo.json',
+      '$normalized/index.json',
+      '$normalized/index_v2.json',
+    ]);
   }
 
-  Map<String, dynamic> infos = {};
-  final match = RegExp(r'^(.*)/[^/]+\.json$').firstMatch(jsonUrl);
-
-  final res = await http.get(Uri.parse(jsonUrl));
-  if (!_checkValidUrl(res)) {
-    return null;
+  // 1. Try ExtensionStoreService (.pb, NetworkExtensionStore JSON, Aidoku JSON index, legacy JSON store)
+  for (final url in urlsToTry) {
+    try {
+      final result = await ExtensionStoreService.fetchStore(url, http);
+      if (result != null &&
+          (result.sources.isNotEmpty || result.name.isNotEmpty)) {
+        String repoName = result.name;
+        if (repoName.isEmpty ||
+            repoName.endsWith('.json') ||
+            repoName == '.dist' ||
+            repoName == 'dist') {
+          repoName = _inferRepoName(Uri.parse(url));
+        }
+        return Repo(
+          name: repoName,
+          website: result.website ?? url,
+          jsonUrl: result.indexUrl,
+        );
+      }
+    } catch (_) {}
   }
 
-  if (match != null) {
-    String url = match.group(1)!;
-    final res = await http.get(Uri.parse("$url/repo.json"));
-    if (res.statusCode == 200) {
-      infos.addAll(jsonDecode(res.body));
-    }
+  // 2. Fallback for custom / legacy JSON list format
+  for (final url in urlsToTry) {
+    try {
+      final res = await http.get(Uri.parse(url));
+      if (_checkValidUrl(res)) {
+        Map<String, dynamic> infos = {};
+        final match = RegExp(r'^(.*)/[^/]+\.json$').firstMatch(url);
+        if (match != null) {
+          String baseUrl = match.group(1)!;
+          try {
+            final repoRes = await http.get(Uri.parse("$baseUrl/repo.json"));
+            if (repoRes.statusCode == 200) {
+              final decoded = jsonDecode(repoRes.body);
+              if (decoded is Map<String, dynamic>) {
+                infos.addAll(decoded);
+              }
+            }
+          } catch (_) {}
+        }
+        infos["jsonUrl"] = url;
+        final repo = Repo.fromJson(infos);
+        if (repo.name == null ||
+            repo.name!.isEmpty ||
+            repo.name!.endsWith('.json') ||
+            repo.name == '.dist' ||
+            repo.name == 'dist') {
+          repo.name = _inferRepoName(Uri.parse(url));
+        }
+        return repo;
+      }
+    } catch (_) {}
   }
 
-  infos["jsonUrl"] = jsonUrl;
-  return Repo.fromJson(infos);
+  return null;
+}
+
+String _inferRepoName(Uri uri) {
+  if (uri.host == 'raw.githubusercontent.com' && uri.pathSegments.length >= 2) {
+    return uri.pathSegments[1];
+  }
+  final segments = uri.pathSegments
+      .where(
+        (s) =>
+            s.isNotEmpty &&
+            !s.endsWith('.json') &&
+            s != '.dist' &&
+            s != 'dist' &&
+            s != 'build' &&
+            s != '.build',
+      )
+      .toList();
+  return segments.lastOrNull ?? uri.host;
 }
 
 bool _checkValidUrl(Response res) {
   try {
-    final sourceList = (jsonDecode(res.body) as List).map(
-      (e) => Source.fromJson(e),
-    );
-    if (sourceList.firstOrNull?.name == null) {
-      return false;
+    final decoded = jsonDecode(res.body);
+    if (decoded is List) {
+      final first = decoded.firstOrNull;
+      if (first is Map && (first['name'] != null || first['site'] != null)) {
+        return true;
+      }
+      final sourceList = decoded.map((e) => Source.fromJson(e));
+      if (sourceList.firstOrNull?.name != null) {
+        return true;
+      }
+    } else if (decoded is Map && decoded['sources'] is List) {
+      return true;
     }
   } catch (err) {
     return false;
   }
-  return true;
+  return false;
 }
 
 final isExtensionServerInstalledStreamProvider = StreamProvider<bool>((
