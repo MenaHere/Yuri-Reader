@@ -1,5 +1,16 @@
 # Yuri-Reader - Change Log
 
+## Version 0.2.4
+
+### [2026-09-20]
+
+#### Fixed
+- Build: the CI Flutter version is no longer pinned by hand. Both workflows now use upstream's own setup (`channel: stable`, no version), so the toolchain follows the Dart requirement in the inherited `pubspec.yaml` automatically
+
+#### Changed
+- Removed the duplicate "Cache Flutter SDK" step, whose key was a literal version and could therefore never follow an upgrade (the Flutter action caches the SDK itself, keyed by version)
+- The sync workflow's combined step is split into `Compose`, `Flutter pub get`, `Cargokit pub get` and `Flutter analyze`, so a failure names the command that failed instead of always reporting "Flutter analyze"
+
 ## Version 0.2.3
 
 ### [2026-09-20]
