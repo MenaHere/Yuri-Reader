@@ -144,6 +144,11 @@ class _DownloadFileScreenState extends ConsumerState<DownloadFileScreen> {
     dynamic l10n,
     String targetVersion,
   ) {
+    // "What's new" opens this dialog for the release the app is already on, so
+    // an arrow from a version to itself would read as an update that does not
+    // exist. The version pair only appears when the versions actually differ.
+    final versionChanged =
+        _currentVersion.isNotEmpty && _currentVersion != targetVersion;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -165,7 +170,7 @@ class _DownloadFileScreenState extends ConsumerState<DownloadFileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                l10n.new_update_available,
+                widget.title ?? l10n.new_update_available,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
@@ -177,7 +182,7 @@ class _DownloadFileScreenState extends ConsumerState<DownloadFileScreen> {
                 runSpacing: 4,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  if (_currentVersion.isNotEmpty) ...[
+                  if (versionChanged) ...[
                     Text(
                       'v$_currentVersion',
                       style: theme.textTheme.labelMedium?.copyWith(
