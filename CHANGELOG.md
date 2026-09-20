@@ -1,5 +1,12 @@
 # Yuri-Reader - Change Log
 
+## Version 0.2.3
+
+### [2026-09-20]
+
+#### Fixed
+- Build: pinned Flutter 3.47.2 -> 3.47.5 (Dart 3.13.2 -> 3.13.4); upstream mangayomi's pubspec now requires Dart ^3.13.3, so the weekly sync failed at `flutter pub get`
+
 ## Version 0.2.2
 
 ### [2026-09-06]
