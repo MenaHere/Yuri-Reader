@@ -137,6 +137,7 @@ jobs:
         run: ./.scripts/build.sh linux
 
       - name: Package Linux bundle
+        id: package
         if: steps.check.outputs.changed == 'true'
         run: |
           cd .build/app/build/linux/x64/release
@@ -145,13 +146,17 @@ jobs:
       # The sync is committed whether or not the build worked, so a failed
       # sync still lands on main and the code can be fixed against the new
       # upstream. Record the outcome before the always() steps below.
+      # "Package Linux bundle" only runs once every earlier build step has
+      # passed, so its outcome is the build's outcome. (The status functions
+      # - success(), failure(), always(), cancelled() - are only valid in if:;
+      # using one in run: rejects the whole workflow as invalid.)
       - name: Build outcome
-        id: outcome
+        id: build_result
         if: always()
-        run: echo "released=${{ success() }}" >> "$GITHUB_OUTPUT"
+        run: echo "released=${{ steps.package.outcome == 'success' }}" >> "$GITHUB_OUTPUT"
 
       - name: Changelog (released)
-        if: steps.outcome.outputs.released == 'true' && steps.check.outputs.real == 'true'
+        if: steps.build_result.outputs.released == 'true' && steps.check.outputs.real == 'true'
         run: |
           VER="$(grep '^version:' dart/pubspec.yaml | cut -d' ' -f2)"
           if [[ "$VER" == *+* ]]; then
@@ -182,7 +187,7 @@ jobs:
           echo "version: $VER -> $NEW_VER"
 
       - name: Changelog (unreleased)
-        if: steps.outcome.outputs.released == 'false' && steps.check.outputs.real == 'true'
+        if: steps.build_result.outputs.released == 'false' && steps.check.outputs.real == 'true'
         run: |
           DATE="$(date -u +%Y-%m-%d)"
           BULLET="- [$DATE] Synced ${{ steps.check.outputs.manga_count }} commits from [mangayomi](https://github.com/kodjodevf/mangayomi), ${{ steps.check.outputs.mal_count }} commits from [malsync](https://github.com/MALSync/MALSync)"
