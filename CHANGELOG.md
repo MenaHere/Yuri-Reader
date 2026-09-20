@@ -1,5 +1,12 @@
 # Yuri-Reader - Change Log
 
+## Version 0.2.9
+
+### [2026-09-20]
+
+#### Fixed
+- The "What's new" view no longer reads as an update that does not exist. It opens the same dialog the update check uses, handing it its own title and the latest release without comparing versions, but the dialog's rewrite in 0.2.8 had replaced the title with a hardcoded "New update available" and added a `current -> target` version pair. On an up-to-date app that produced "New update available  v0.2.8 -> v0.2.8" with a Download button. The dialog shows the title it is given again, and the version pair is drawn only when the two versions actually differ
+
 ## Version 0.2.8
 
 ### [2026-09-20]
