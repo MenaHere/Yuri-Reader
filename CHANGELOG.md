@@ -1,5 +1,12 @@
 # Yuri-Reader - Change Log
 
+## Version 0.2.10
+
+### [2026-09-21]
+
+#### Fixed
+- The Browse extension list fills up again. Mangayomi's extension index states the app version every extension needs (`appMinVerReq`, currently 0.5.0), and the app compared that with its own version - which the fork numbers on its own scale - so every extension was discarded and the list came out empty, while the same repository filled up on upstream mangayomi 0.9.6. The comparison now uses the mangayomi version the tree is built from, read from the vendored manifest by `compose.sh`, and `compose.sh` fails loudly if upstream reshapes the lines it edits. The fork's own numbering, and the update check that reads it, are untouched
+
 ## Version 0.2.9
 
 ### [2026-09-20]

@@ -77,4 +77,34 @@ mv "$OUT/rust_builder/macos/rust_lib_mangayomi.podspec" \
 # --- bridge custom files ---------------------------------------------------
 rsync -a --exclude vendor "$ROOT/dart/." "$OUT/"
 
+# --- extension compatibility version ---------------------------------------
+# Mangayomi's extension index states the app version each extension needs
+# (appMinVerReq, currently 0.5.0) and fetch_sources_list.dart compares that with
+# the app's own version. The fork carries its own release numbering (0.2.x), so
+# the comparison is false for every extension and the Browse extension list
+# comes out empty while the same repository fills up on upstream. What the
+# extensions are really tested against is the mangayomi version this tree is
+# built from, so the check is pointed at that version instead. The fork's own
+# numbering, and the update check that reads it, are left alone.
+#
+# Runs after the overlay so a fork copy of the file cannot undo it, and fails
+# loudly if upstream reshapes the lines it edits.
+BASE_VERSION="$(sed -n 's/^version: *\([0-9][0-9.]*\).*/\1/p' "$SRC/pubspec.yaml" | head -1)"
+if [ -z "$BASE_VERSION" ]; then
+  echo "error: cannot read the mangayomi version from $SRC/pubspec.yaml" >&2
+  exit 1
+fi
+COMPAT_FILE="$OUT/lib/services/fetch_sources_list.dart"
+sed -i \
+  -e "s|^import 'package:package_info_plus/package_info_plus.dart';\$|const _mangayomiBaseVersion = '$BASE_VERSION';|" \
+  -e "s|^  final info = await PackageInfo.fromPlatform();\$|  final info = (version: _mangayomiBaseVersion);|" \
+  "$COMPAT_FILE"
+if ! grep -q "^const _mangayomiBaseVersion = '$BASE_VERSION';$" "$COMPAT_FILE" \
+  || grep -q "PackageInfo.fromPlatform" "$COMPAT_FILE" \
+  || [ "$(grep -c 'compareVersions(info.version,' "$COMPAT_FILE")" -lt 2 ]; then
+  echo "error: the extension compatibility patch no longer applies to fetch_sources_list.dart" >&2
+  exit 1
+fi
+echo "extension compatibility version: $BASE_VERSION"
+
 echo "composed: $OUT"
