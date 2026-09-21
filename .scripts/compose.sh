@@ -96,10 +96,20 @@ if [ -z "$BASE_VERSION" ]; then
 fi
 COMPAT_FILE="$OUT/lib/services/fetch_sources_list.dart"
 sed -i \
-  -e "s|^import 'package:package_info_plus/package_info_plus.dart';\$|const _mangayomiBaseVersion = '$BASE_VERSION';|" \
+  -e "/^import 'package:package_info_plus\/package_info_plus.dart';\$/d" \
   -e "s|^  final info = await PackageInfo.fromPlatform();\$|  final info = (version: _mangayomiBaseVersion);|" \
   "$COMPAT_FILE"
-if ! grep -q "^const _mangayomiBaseVersion = '$BASE_VERSION';$" "$COMPAT_FILE" \
+# Declared at the end of the file: Dart wants every directive (the imports) to
+# come before any declaration, so this cannot sit where the import was.
+{
+  echo ""
+  echo "/// The mangayomi version this tree is built from. The extension index"
+  echo "/// states the app version each extension needs, and the fork numbers"
+  echo "/// itself on its own scale, which the index knows nothing about, so the"
+  echo "/// compatibility check reads this instead. Set by .scripts/compose.sh."
+  echo "const _mangayomiBaseVersion = '$BASE_VERSION';"
+} >> "$COMPAT_FILE"
+if ! grep -q "^const _mangayomiBaseVersion = '$BASE_VERSION';\$" "$COMPAT_FILE" \
   || grep -q "PackageInfo.fromPlatform" "$COMPAT_FILE" \
   || [ "$(grep -c 'compareVersions(info.version,' "$COMPAT_FILE")" -lt 2 ]; then
   echo "error: the extension compatibility patch no longer applies to fetch_sources_list.dart" >&2
