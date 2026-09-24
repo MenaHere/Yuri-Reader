@@ -1,5 +1,13 @@
 # Yuri-Reader - Change Log
 
+## Version 0.2.11
+
+### [2026-09-24]
+
+#### Changed
+- MAL-Sync sits in its own "Sync Tools" section at the top of the Tracking screen, instead of being the last row of the Services list. It is the sync layer the service rows hand off to, not another service, and sitting under "Services" made it read as one
+- The MAL-Sync row no longer borrows MyAnimeList's icon. It draws a sync glyph in a neutral colour, so it no longer looks like a second MyAnimeList entry. The Tracker Library header and the Manage Trackers grid draw the same glyph for it
+
 ## Version 0.2.10
 
 ### [2026-09-21]

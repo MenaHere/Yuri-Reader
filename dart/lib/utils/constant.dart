@@ -101,9 +101,14 @@ TrackStatus toTrackStatus(TrackStatus status, ItemType itemType, int syncId) {
       const Color.fromRGBO(175, 54, 162, 1),
     ),
     6 => (
-      "assets/trackers_icons/tracker_mal.webp",
+      // MAL-Sync is a tool, not one of the tracker services. It has no site of
+      // its own, so it has no icon of its own either, and borrowing
+      // MyAnimeList's would read as "another MAL" rather than "the sync
+      // layer". The row draws a glyph instead, in a neutral colour: see
+      // trackerIcon below.
+      "",
       "MAL-Sync",
-      const Color.fromRGBO(46, 81, 162, 1),
+      const Color.fromRGBO(69, 90, 100, 1),
     ),
     _ => (
       "assets/trackers_icons/tracker_trakt.webp",
@@ -111,6 +116,22 @@ TrackStatus toTrackStatus(TrackStatus status, ItemType itemType, int syncId) {
       const Color.fromRGBO(175, 54, 162, 1),
     ),
   };
+}
+
+/// The mark a tracker shows in a list: its own icon asset when it has one, a
+/// drawn glyph when it does not. Lives here so every screen that lists a
+/// tracker (tracking settings, the tracker library, manage trackers) draws it
+/// the same way instead of each deciding for itself.
+///
+/// [size] is the drawn size of the glyph; [imageHeight] the height the icon
+/// asset is drawn at, or null to let the asset fill the box it is in (the
+/// manage-trackers grid does that).
+Widget trackerIcon(int id, {double size = 30, double? imageHeight = 30}) {
+  final iconPath = trackInfos(id).$1;
+  if (iconPath.isEmpty) {
+    return Icon(Icons.sync_alt, size: size, color: Colors.white);
+  }
+  return Image.asset(iconPath, height: imageHeight);
 }
 
 String toImgUrl(String url) {

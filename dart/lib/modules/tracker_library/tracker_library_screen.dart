@@ -154,10 +154,7 @@ class _TrackerLibraryScreenState extends ConsumerState<TrackerLibraryScreen> {
                 ),
                 width: 60,
                 height: 70,
-                child: Image.asset(
-                  trackInfos(trackerProvider.syncId).$1,
-                  height: 30,
-                ),
+                child: trackerIcon(trackerProvider.syncId),
               ),
             ),
           ),
@@ -678,7 +675,7 @@ class _TrackerLibraryScreenState extends ConsumerState<TrackerLibraryScreen> {
           width: 60,
           height: 70,
           child: isManga == null
-              ? Image.asset(trackInfos(syncId).$1, height: 30)
+              ? trackerIcon(syncId)
               : Icon(
                   isManga ? Icons.collections_bookmark : Icons.video_collection,
                   size: 30,
