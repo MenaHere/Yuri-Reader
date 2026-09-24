@@ -115,6 +115,37 @@ class YuriSyncService {
     return response['result'] as Map<String, dynamic>;
   }
 
+  /// The tracked list for one provider, the same list the MAL-Sync app itself
+  /// shows. [type] is `'manga'` or `'anime'`, [status] is malsync's numbering:
+  /// 1 watching/reading, 2 completed, 3 on hold, 4 dropped, 6 plan to watch,
+  /// 7 everything.
+  Future<List<Map<String, dynamic>>> entryList({
+    required String type,
+    int status = 7,
+    String? provider,
+  }) async {
+    final response = await _call('entry.list', {
+      'type': type,
+      'status': status,
+      'provider': provider,
+    });
+    if (response['error'] != null) {
+      throw Exception('entry.list failed: ${response['error']['message']}');
+    }
+    final result = response['result'] as Map<String, dynamic>;
+    return (result['results'] as List).cast<Map<String, dynamic>>();
+  }
+
+  /// The settings the bridge holds. Credentials are left out.
+  Future<Map<String, dynamic>> settingsList() async {
+    final response = await _call('settings.list', {});
+    if (response['error'] != null) {
+      throw Exception('settings.list failed: ${response['error']['message']}');
+    }
+    final result = response['result'] as Map<String, dynamic>;
+    return result['settings'] as Map<String, dynamic>;
+  }
+
   /// Shut down the sync binary and clean up.
   void dispose() {
     _client?.disconnect();

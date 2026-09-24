@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:isar_community/isar.dart';
 import 'package:yuri_reader/main.dart';
 import 'package:yuri_reader/models/track_preference.dart';
+import 'package:yuri_reader/modules/malsync/malsync_screen.dart';
 import 'package:yuri_reader/modules/more/settings/track/providers/track_providers.dart';
 import 'package:yuri_reader/modules/more/settings/track/widgets/track_listile.dart';
 import 'package:yuri_reader/modules/more/widgets/list_tile_widget.dart';
@@ -15,7 +16,6 @@ import 'package:yuri_reader/services/trackers/kitsu.dart';
 import 'package:yuri_reader/services/trackers/myanimelist.dart';
 import 'package:yuri_reader/services/trackers/simkl.dart';
 import 'package:yuri_reader/services/trackers/trakt_tv.dart';
-import 'package:yuri_reader/utils/constant.dart';
 import 'package:yuri_reader/utils/extensions/build_context_extensions.dart';
 
 class TrackScreen extends ConsumerWidget {
@@ -88,11 +88,12 @@ class TrackScreen extends ConsumerWidget {
                   },
                   id: TrackerProviders.malsync.syncId,
                   entries: entries!,
-                  // MAL-Sync keeps the tracked list and its settings in its own
-                  // web app, so the row opens that instead of a page of ours.
-                  onSettings: () => context.push(
-                    '/mangawebview',
-                    extra: {'url': malsyncPwaUrl, 'title': 'MAL-Sync'},
+                  // MAL-Sync's own screens: the tracked list and its settings,
+                  // drawn from the bridge rather than a page of ours.
+                  onSettings: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MalSyncScreen(),
+                    ),
                   ),
                 ),
                 Padding(
