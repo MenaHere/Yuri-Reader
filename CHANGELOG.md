@@ -1,5 +1,13 @@
 # Yuri-Reader - Change Log
 
+## Version 0.3.0
+
+### [2026-09-24]
+
+#### Added
+- MAL-Sync opens its own web app. The MAL-Sync row in the Tracking screen now has a settings button (left of the green tick), and its tile in Manage Trackers opens the same place: MAL-Sync's page at `malsync.moe/pwa`, where the anime and manga it tracks and all of its settings live. Both used to lead to an in-app page listing only what the local bridge had stored, which is not what MAL-Sync shows
+- The in-app browser takes a `captureCookies` flag. Copying a page's cookies and its user agent into the app's HTTP settings is only right for extension pages, which feed the resolver that retries a blocked request. It was not scoped to the page: it wrote the app-wide user agent and kept the page's cookies for that host. A page that is not an extension, such as MAL-Sync's, no longer does either
+
 ## Version 0.2.11
 
 ### [2026-09-24]
