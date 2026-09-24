@@ -6,9 +6,8 @@ with [MALSync](https://github.com/MALSync/MALSync)-based tracking.
 ## Features
 
 - Read manga, webtoons, comics, and novels; watch anime
-- Tracker support: MyAnimeList, AniList, SIMKL, Trakt, Kitsu, and MAL-Sync
-- Configurable reader with multiple viewers and reading directions
-- Categories, light/dark themes, local backups
+- Tracker support:
+  - MAL-Sync: MyAnimeList, AniList, SIMKL, Trakt, Kitsu
 
 ## Quick Start
 
