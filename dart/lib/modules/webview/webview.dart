@@ -18,7 +18,19 @@ import 'package:share_plus/share_plus.dart';
 class MangaWebView extends ConsumerStatefulWidget {
   final String url;
   final String title;
-  const MangaWebView({super.key, required this.url, required this.title});
+
+  /// Whether to copy the page's cookies and its user agent into the app's HTTP
+  /// settings. Only extension pages need that: they feed the resolver that
+  /// retries a blocked request. Any other page must not, because the copy is
+  /// not scoped to the page - it writes the app-wide user agent and keeps the
+  /// page's cookies for that host.
+  final bool captureCookies;
+  const MangaWebView({
+    super.key,
+    required this.url,
+    required this.title,
+    this.captureCookies = true,
+  });
 
   @override
   ConsumerState<MangaWebView> createState() => _MangaWebViewState();
@@ -77,25 +89,28 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
     if (Platform.isLinux) {
       _desktopWebview = await WebviewWindow.create();
 
-      final timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
-        try {
-          final cookieList = await _desktopWebview!.getAllCookies();
-          final ua =
-              await _desktopWebview!.evaluateJavaScript(
-                "navigator.userAgent",
-              ) ??
-              "";
-          final cookie = cookieList
-              .map((e) => "${e.name}=${e.value}")
-              .join(";");
-          await MClient.setCookie(_url, ua, null, cookie: cookie);
-        } catch (_) {}
-      });
+      Timer? timer;
+      if (widget.captureCookies) {
+        timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+          try {
+            final cookieList = await _desktopWebview!.getAllCookies();
+            final ua =
+                await _desktopWebview!.evaluateJavaScript(
+                  "navigator.userAgent",
+                ) ??
+                "";
+            final cookie = cookieList
+                .map((e) => "${e.name}=${e.value}")
+                .join(";");
+            await MClient.setCookie(_url, ua, null, cookie: cookie);
+          } catch (_) {}
+        });
+      }
       _desktopWebview!
         ..setBrightness(Brightness.dark)
         ..launch(widget.url)
         ..onClose.whenComplete(() {
-          timer.cancel();
+          timer?.cancel();
           if (mounted) {
             Navigator.pop(context);
           }
@@ -103,6 +118,7 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
     } else {
       browser = MyInAppBrowser(
         context: context,
+        captureCookies: widget.captureCookies,
         controller: (controller) {
           _webViewController = controller;
         },
@@ -341,16 +357,18 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
                           },
                           onUpdateVisitedHistory:
                               (controller, url, isReload) async {
-                                final ua =
-                                    await controller.evaluateJavascript(
-                                      source: "navigator.userAgent",
-                                    ) ??
-                                    "";
-                                await MClient.setCookie(
-                                  url.toString(),
-                                  ua,
-                                  controller,
-                                );
+                                if (widget.captureCookies) {
+                                  final ua =
+                                      await controller.evaluateJavascript(
+                                        source: "navigator.userAgent",
+                                      ) ??
+                                      "";
+                                  await MClient.setCookie(
+                                    url.toString(),
+                                    ua,
+                                    controller,
+                                  );
+                                }
                                 final canGoback = await controller.canGoBack();
                                 final canGoForward = await controller
                                     .canGoForward();
@@ -379,11 +397,13 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
 
 class MyInAppBrowser extends InAppBrowser {
   BuildContext context;
+  bool captureCookies;
   void Function(InAppWebViewController) controller;
   void Function(int) onProgress;
   void Function() onExitCallback;
   MyInAppBrowser({
     required this.context,
+    required this.captureCookies,
     required this.controller,
     required this.onProgress,
     required this.onExitCallback,
@@ -406,6 +426,7 @@ class MyInAppBrowser extends InAppBrowser {
 
   @override
   void onLoadStop(url) async {
+    if (!captureCookies) return;
     if (webViewController != null) {
       final ua =
           await webViewController!.evaluateJavascript(

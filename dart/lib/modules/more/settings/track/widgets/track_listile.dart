@@ -11,12 +11,18 @@ class TrackListile extends ConsumerWidget {
   final int id;
   final List<TrackPreference> entries;
   final String? text;
+
+  /// Opens the tracker's own settings page, when it has one. MAL-Sync does
+  /// (its web app holds both the tracked list and the settings); the services
+  /// do not, and then no button is shown.
+  final VoidCallback? onSettings;
   const TrackListile({
     super.key,
     required this.onTap,
     required this.id,
     required this.entries,
     this.text,
+    this.onSettings,
   });
 
   @override
@@ -38,9 +44,23 @@ class TrackListile extends ConsumerWidget {
           height: 70,
           child: trackerIcon(id),
         ),
-        trailing: (isLogged
-            ? const Icon(Icons.check, size: 30, color: Colors.green)
-            : null),
+        trailing: (onSettings == null && !isLogged)
+            ? null
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Left of the green tick, where a tracker that has its own
+                  // settings page shows it.
+                  if (onSettings != null)
+                    IconButton(
+                      onPressed: onSettings,
+                      tooltip: l10n.settings,
+                      icon: const Icon(Icons.settings, size: 26),
+                    ),
+                  if (isLogged)
+                    const Icon(Icons.check, size: 30, color: Colors.green),
+                ],
+              ),
         onTap: isLogged
             ? () {
                 showDialog(

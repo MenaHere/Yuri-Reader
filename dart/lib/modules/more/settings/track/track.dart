@@ -15,6 +15,7 @@ import 'package:yuri_reader/services/trackers/kitsu.dart';
 import 'package:yuri_reader/services/trackers/myanimelist.dart';
 import 'package:yuri_reader/services/trackers/simkl.dart';
 import 'package:yuri_reader/services/trackers/trakt_tv.dart';
+import 'package:yuri_reader/utils/constant.dart';
 import 'package:yuri_reader/utils/extensions/build_context_extensions.dart';
 
 class TrackScreen extends ConsumerWidget {
@@ -87,6 +88,12 @@ class TrackScreen extends ConsumerWidget {
                   },
                   id: TrackerProviders.malsync.syncId,
                   entries: entries!,
+                  // MAL-Sync keeps the tracked list and its settings in its own
+                  // web app, so the row opens that instead of a page of ours.
+                  onSettings: () => context.push(
+                    '/mangawebview',
+                    extra: {'url': malsyncPwaUrl, 'title': 'MAL-Sync'},
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(
