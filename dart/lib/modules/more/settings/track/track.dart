@@ -58,6 +58,46 @@ class TrackScreen extends ConsumerWidget {
                   child: Row(
                     children: [
                       Text(
+                        'Sync Tools',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: context.primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // MAL-Sync is the sync layer itself, not one of the tracker
+                // services: it is not a site you log in to, and it does not
+                // belong in the Services list below. It gets its own section,
+                // first, because everything else here talks to it.
+                TrackListile(
+                  onTap: () async {
+                    final notifier = ref.read(
+                      tracksProvider(
+                        syncId: TrackerProviders.malsync.syncId,
+                      ).notifier,
+                    );
+                    notifier.login(
+                      TrackPreference(
+                        syncId: TrackerProviders.malsync.syncId,
+                        username: 'MAL-Sync',
+                      ),
+                    );
+                  },
+                  id: TrackerProviders.malsync.syncId,
+                  entries: entries!,
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(
+                    left: 15,
+                    right: 15,
+                    bottom: 10,
+                    top: 5,
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
                         l10n.services,
                         style: TextStyle(
                           fontSize: 13,
@@ -79,7 +119,7 @@ class TrackScreen extends ConsumerWidget {
                         .login();
                   },
                   id: TrackerProviders.anilist.syncId,
-                  entries: entries!,
+                  entries: entries,
                 ),
                 TrackListile(
                   onTap: () => _showDialogLogin(context, ref),
@@ -129,23 +169,6 @@ class TrackScreen extends ConsumerWidget {
                         .login();
                   },
                   id: TrackerProviders.trakt.syncId,
-                  entries: entries,
-                ),
-                TrackListile(
-                  onTap: () async {
-                    final notifier = ref.read(
-                      tracksProvider(
-                        syncId: TrackerProviders.malsync.syncId,
-                      ).notifier,
-                    );
-                    notifier.login(
-                      TrackPreference(
-                        syncId: TrackerProviders.malsync.syncId,
-                        username: 'MAL-Sync',
-                      ),
-                    );
-                  },
-                  id: TrackerProviders.malsync.syncId,
                   entries: entries,
                 ),
                 ListTile(
