@@ -1,7 +1,7 @@
 # Yuri-Reader
 
 A manga/anime reader app built on [Mangayomi](https://github.com/kodjodevf/mangayomi),
-with MALSync-based tracking.
+with [MALSync](https://github.com/MALSync/MALSync)-based tracking.
 
 ## Features
 
