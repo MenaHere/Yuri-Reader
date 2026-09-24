@@ -73,13 +73,6 @@ TrackStatus toTrackStatus(TrackStatus status, ItemType itemType, int syncId) {
       : status;
 }
 
-/// MAL-Sync's own web app: the anime/manga it is tracking, and its settings
-/// (its nav bar has the gear). The app opens this page instead of drawing
-/// MAL-Sync screens of its own, so the list and the settings are the ones
-/// MAL-Sync maintains. `#/book/anime/1`, `#/book/manga/1` and `#/settings` are
-/// the pages behind it.
-const malsyncPwaUrl = 'https://malsync.moe/pwa/';
-
 (String, String, Color) trackInfos(int id) {
   return switch (id) {
     1 => (

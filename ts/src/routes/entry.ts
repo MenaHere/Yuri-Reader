@@ -1,8 +1,54 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import { getSingle } from '../../vendor/malsync/src/_provider/singleFactory';
+import { getList } from '../../vendor/malsync/src/_provider/listFactory';
+import type { listElement } from '../../vendor/malsync/src/_provider/listAbstract';
 import * as definitions from '../../vendor/malsync/src/_provider/definitions';
 import { api } from '../shim/api';
+
+/// One entry of the tracked list, in the shape a list needs: what to draw
+/// (title, cover, progress) and how to open it (url, mediaId).
+function listEntryToJson(entry: listElement): Record<string, unknown> {
+  const isAnime = entry.type === 'anime';
+  return {
+    uid: entry.uid,
+    malId: entry.malId,
+    type: entry.type,
+    title: entry.title,
+    url: entry.url,
+    score: entry.score,
+    progress: isAnime ? entry.watchedEp : entry.readVol ?? 0,
+    total: isAnime ? entry.totalEp : entry.totalVol ?? 0,
+    status: entry.status,
+    startDate: entry.startDate,
+    finishDate: entry.finishDate,
+    rewatchCount: entry.rewatchCount,
+    image: entry.image,
+    tags: entry.tags,
+    airingState: entry.airingState ?? null,
+  };
+}
+
+/// The tracked list for one provider, the same list the MAL-Sync app itself
+/// shows: malsync's own list classes do the fetching. [status] is malsync's
+/// numbering (1 watching, 2 completed, 3 on hold, 4 dropped, 6 plan to watch,
+/// 7 everything).
+///
+/// Reading the list is not a reason to change the sync mode: malsync's list
+/// classes pick the configured one themselves. [provider] is only honoured
+/// when it is actually given.
+export async function handleEntryList(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const provider = typeof params.provider === 'string' && params.provider ? (params.provider as string) : null;
+  const type = (params.type as 'anime' | 'manga') || 'anime';
+  const status =
+    typeof params.status === 'number' ? (params.status as number) : definitions.status.All;
+
+  if (provider) await setSyncMode(provider);
+  const list = await getList(status, type);
+  const entries = await list.getCompleteList();
+
+  return { provider, type, status, results: entries.map(listEntryToJson) };
+}
 
 function malUrl(type: 'anime' | 'manga', id: number | string): string {
   return `https://myanimelist.net/${type}/${id}`;

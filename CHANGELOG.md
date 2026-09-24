@@ -1,5 +1,16 @@
 # Yuri-Reader - Change Log
 
+## Version 0.4.0
+
+### [2026-09-24]
+
+#### Added
+- MAL-Sync's list and settings are in the app. The gear on the MAL-Sync row in Tracking, and its tile in Manage Trackers, open the tracked list: the anime/manga switch, the state dropdown and the cover cards, laid out the way MAL-Sync's own app lays them out, with its palette and its state colours. The gear there opens the settings the bridge acts on. Both read through the bridge, which runs malsync's own list classes, so the list is the one its app shows
+- The bridge gained `entry.list` (the tracked list for a provider, by state) and `settings.list` (the settings it holds, credentials excluded)
+
+#### Fixed
+- The MAL-Sync button opens those screens instead of MAL-Sync's web page. 0.3.0 pointed it at `malsync.moe/pwa`, which is an empty shell: its content is injected by the MAL-Sync browser extension, so without that extension the page is blank and the button opened nothing
+
 ## Version 0.3.0
 
 ### [2026-09-24]

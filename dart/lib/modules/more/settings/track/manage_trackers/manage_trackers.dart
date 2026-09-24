@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:yuri_reader/models/track_preference.dart';
+import 'package:yuri_reader/modules/malsync/malsync_screen.dart';
 import 'package:yuri_reader/modules/tracker_library/tracker_library_screen.dart';
 import 'package:yuri_reader/modules/widgets/gridview_widget.dart';
 import 'package:yuri_reader/modules/widgets/tracker_account_avatar.dart';
@@ -43,11 +44,12 @@ class _ManageTrackersScreenState extends State<ManageTrackersScreen> {
               ),
               onPressed: () {
                 // MAL-Sync has no tracker detail page of ours worth showing:
-                // its tracked list and its settings live in its own web app.
+                // its tracked list and its settings are its own screens.
                 if (trackerPref.syncId == TrackerProviders.malsync.syncId) {
-                  context.push(
-                    '/mangawebview',
-                    extra: {'url': malsyncPwaUrl, 'title': 'MAL-Sync'},
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MalSyncScreen(),
+                    ),
                   );
                 } else {
                   context.push('/trackingDetail', extra: trackerPref);

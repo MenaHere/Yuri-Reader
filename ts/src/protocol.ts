@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import { handleAuthGetUrl, handleAuthExchange, handleAuthRefresh } from './routes/auth';
-import { handleSettingsSet, handleSettingsGet } from './routes/settings';
+import { handleSettingsSet, handleSettingsGet, handleSettingsList } from './routes/settings';
 import { handleSearch } from './routes/search';
-import { handleEntryGet, handleEntryUpdate, handleEntryAdd, handleEntryDelete } from './routes/entry';
+import {
+  handleEntryGet,
+  handleEntryUpdate,
+  handleEntryAdd,
+  handleEntryDelete,
+  handleEntryList,
+} from './routes/entry';
 import { handleTrackAuto } from './routes/track';
 
 export interface JsonRpcRequest {
@@ -54,6 +60,9 @@ export async function handleMessage(request: JsonRpcRequest): Promise<JsonRpcRes
       case 'entry.get':
         result = await handleEntryGet(params || {});
         break;
+      case 'entry.list':
+        result = await handleEntryList(params || {});
+        break;
       case 'entry.update':
         result = await handleEntryUpdate(params || {});
         break;
@@ -73,6 +82,9 @@ export async function handleMessage(request: JsonRpcRequest): Promise<JsonRpcRes
         break;
       case 'settings.get':
         result = handleSettingsGet(params || {});
+        break;
+      case 'settings.list':
+        result = handleSettingsList();
         break;
 
       default:
