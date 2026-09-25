@@ -1,5 +1,12 @@
 # Yuri-Reader - Change Log
 
+## Version 0.5.3
+
+### [2026-09-25]
+
+#### Added
+- When the MAL-Sync list says there is no login, it now says so as its own state and offers a button straight to the tracking settings, since that is where the login happens. Before it showed the bridge's error and a retry, which could not help
+
 ## Version 0.5.2
 
 ### [2026-09-25]
