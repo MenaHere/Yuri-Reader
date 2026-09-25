@@ -1,5 +1,12 @@
 # Yuri-Reader - Change Log
 
+## Version 0.5.1
+
+### [2026-09-25]
+
+#### Changed
+- The entry page is drawn the way MAL-Sync's app draws it, from its own stylesheet rather than by eye: the cover is a 300px card (10px corners, 225 by 350, a soft shadow) and the controls sit under it once the window is 900px wide, with the title beside it at 1.5x and the state dot. The controls take its shapes - 2px outlined surfaces, 5px corners on the small count fields, 30px pills for the status and score - and its rhythm: sections 15px apart on a 60px minimum, a 2px divider. The state dot is 16px and outlined rather than filled when an entry has no state
+
 ## Version 0.5.0
 
 ### [2026-09-25]

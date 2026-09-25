@@ -75,6 +75,29 @@ abstract final class MalSyncStyle {
   /// A rounded pill, which their buttons and dropdowns use.
   static const pillRadius = 15.0;
 
+  /// Their buttons and fields are 2px outlines over the surface colour.
+  static const controlBorderWidth = 2.0;
+
+  /// Their pill controls are 30px tall, their buttons and fields carry a
+  /// 10px corner, and the small ones a 5px one.
+  static const pillHeight = 30.0;
+  static const controlRadius = 10.0;
+  static const miniRadius = 5.0;
+
+  /// Their state dot is 16px across and sits 0.5em before the text it marks.
+  static const dotSize = 16.0;
+
+  /// Their overview lays the cover and the controls in a 300px column beside
+  /// the title once the window is at least 900px wide.
+  static const overviewBreakpoint = 900.0;
+  static const overviewColumnWidth = 300.0;
+
+  /// Their controls sit in rows with this gap, 5px under the label row.
+  static const labelRowGap = 5.0;
+
+  /// A section, and the gap under a divider, are one spacer.
+  static const sectionGap = spacer;
+
   /// The state names their app shows, in their order, with the values it sends.
   static const listStates = <int>[7, 1, 2, 3, 4, 6];
 
@@ -96,5 +119,17 @@ abstract final class MalSyncStyle {
       default:
         return 'None';
     }
+  }
+
+  /// The outlined surface their buttons, fields and dropdowns are drawn on.
+  static BoxDecoration control(BuildContext context, {double radius = controlRadius}) {
+    return BoxDecoration(
+      color: foreground(context),
+      border: Border.all(
+        color: backdrop(context),
+        width: controlBorderWidth,
+      ),
+      borderRadius: BorderRadius.circular(radius),
+    );
   }
 }

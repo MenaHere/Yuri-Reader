@@ -236,12 +236,16 @@ class MalSyncTypeSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Their `FormSwitch`: a 2px outlined pill whose picked side is filled.
     return Container(
       decoration: BoxDecoration(
         color: MalSyncStyle.foreground(context),
-        borderRadius: BorderRadius.circular(MalSyncStyle.pillRadius),
+        border: Border.all(
+          color: MalSyncStyle.backdrop(context),
+          width: MalSyncStyle.controlBorderWidth,
+        ),
+        borderRadius: BorderRadius.circular(30),
       ),
-      padding: const EdgeInsets.all(3),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -261,16 +265,16 @@ class MalSyncTypeSwitch extends StatelessWidget {
     return GestureDetector(
       onTap: () => onChanged(value),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        margin: const EdgeInsets.all(-2),
         decoration: BoxDecoration(
           color: selected ? MalSyncStyle.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(MalSyncStyle.pillRadius),
+          borderRadius: BorderRadius.circular(30),
         ),
         child: Text(
           label,
           style: TextStyle(
             color: selected ? Colors.white : MalSyncStyle.text(context),
-            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -310,22 +314,19 @@ class MalSyncStateDropdown extends StatelessWidget {
           ),
       ],
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-        decoration: BoxDecoration(
-          color: MalSyncStyle.foreground(context),
-          borderRadius: BorderRadius.circular(MalSyncStyle.pillRadius),
+        height: MalSyncStyle.pillHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: MalSyncStyle.control(
+          context,
+          radius: MalSyncStyle.pillRadius,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             MalSyncStateDot(state: state),
-            const SizedBox(width: 10),
             Text(
               MalSyncStyle.stateName(state, isManga: isManga),
-              style: TextStyle(
-                color: MalSyncStyle.text(context),
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(color: MalSyncStyle.text(context)),
             ),
           ],
         ),
@@ -334,7 +335,9 @@ class MalSyncStateDropdown extends StatelessWidget {
   }
 }
 
-/// The coloured dot their app puts before every state name.
+/// The coloured dot their app puts before every state name: 16px across, half
+/// an em before the text it marks, and an outline rather than a fill when the
+/// entry has no state.
 class MalSyncStateDot extends StatelessWidget {
   const MalSyncStateDot({super.key, required this.state});
 
@@ -342,11 +345,16 @@ class MalSyncStateDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isNone = state == 0;
     return Container(
-      width: 10,
-      height: 10,
+      width: MalSyncStyle.dotSize,
+      height: MalSyncStyle.dotSize,
+      margin: const EdgeInsets.only(right: 8),
       decoration: BoxDecoration(
-        color: MalSyncStyle.stateColor(state),
+        color: isNone ? Colors.transparent : MalSyncStyle.stateColor(state),
+        border: isNone
+            ? Border.all(color: MalSyncStyle.text(context), width: 1)
+            : null,
         shape: BoxShape.circle,
       ),
     );
