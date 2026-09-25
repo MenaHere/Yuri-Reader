@@ -1,5 +1,13 @@
 # Yuri-Reader - Change Log
 
+## Version 0.5.0
+
+### [2026-09-25]
+
+#### Added
+- An entry's own page, opened by tapping a cover in the MAL-Sync list, the way MAL-Sync's app opens it: the cover and the state it is in, then the controls that write back through the bridge - the episode or chapter count with a step button and a slider, a volume row for manga, the status dropdown and the score. A change is saved as it is made, and the list is re-read when the page closes
+- The tracked list reports an entry's volumes, and the app can set them
+
 ## Version 0.4.2
 
 ### [2026-09-25]

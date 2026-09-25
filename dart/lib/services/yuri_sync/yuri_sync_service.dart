@@ -116,6 +116,7 @@ class YuriSyncService {
     int? progress,
     int? status,
     int? score,
+    int? volume,
     String? provider,
   }) async {
     final params = <String, dynamic>{
@@ -124,6 +125,7 @@ class YuriSyncService {
       'progress': progress,
       'status': status,
       'score': score,
+      'volume': volume,
       'provider': provider,
     };
     final response = await _call('entry.update', params);
