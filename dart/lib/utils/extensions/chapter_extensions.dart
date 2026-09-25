@@ -13,6 +13,7 @@ import 'package:yuri_reader/modules/manga/detail/providers/track_state_providers
 import 'package:yuri_reader/modules/manga/reader/providers/push_router.dart';
 import 'package:yuri_reader/utils/extensions/manga_extensions.dart';
 import 'package:yuri_reader/modules/more/settings/track/providers/track_providers.dart';
+import 'package:yuri_reader/modules/tracker_library/tracker_library_screen.dart';
 import 'package:yuri_reader/providers/storage_provider.dart';
 import 'package:yuri_reader/services/download_manager/download_isolate_pool.dart';
 import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';
@@ -110,12 +111,24 @@ extension ChapterExtension on Chapter {
         .mangaIdEqualTo(manga.id!)
         .findAllSync();
 
+    // MAL-Sync and the native trackers write the same accounts, and they read
+    // the chapter number differently (the bridge searches by title, the native
+    // trackers use this app's recognition), so both running pushes the same
+    // title twice and can leave the two disagreeing about the progress. When
+    // MAL-Sync is enabled it owns the update and the native rows are left to
+    // it.
+    final malsyncOwnsTracking = isar.trackPreferences
+        .filter()
+        .syncIdIsNotNull()
+        .syncIdEqualTo(TrackerProviders.malsync.syncId)
+        .findFirstSync() != null;
+
     // Always attempt to sync via the Yuri-Sync MALSync bridge (fire-and-forget).
     unawaited(
       _syncViaYuriSync(manga.name!, chapterNumber, manga.itemType),
     );
 
-    if (tracks.isEmpty) return;
+    if (tracks.isEmpty || malsyncOwnsTracking) return;
     for (var track in tracks) {
       final service = isar.trackPreferences
           .filter()
