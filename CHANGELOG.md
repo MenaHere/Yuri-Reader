@@ -1,5 +1,13 @@
 # Yuri-Reader - Change Log
 
+## Version 0.4.1
+
+### [2026-09-25]
+
+#### Fixed
+- The sync service starts again. 0.4.0's list call pulled in malsync's list classes, which require Vue, and the packaged service had no Vue in it: it exited at startup with `Cannot find module 'vue'`, so every tracker stopped working, not only the new screen. The service now carries the stub its build always assumed (`ts/shims/vue`), and the packaged binary was checked to start and to answer `settings.list` and `entry.list` again
+- A failure that carries no message of its own reaches the app with words. malsync's "not logged in" error has an empty message, so the MAL-Sync screen showed a bare "Exception:"; it now reads "not logged in to the tracking service"
+
 ## Version 0.4.0
 
 ### [2026-09-24]

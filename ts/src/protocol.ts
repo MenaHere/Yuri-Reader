@@ -32,6 +32,17 @@ export interface JsonRpcError {
   data?: unknown;
 }
 
+/// Some of malsync's errors carry no message at all - `NotAutenticatedError`
+/// is one - and an empty message reaches the app as a bare "Exception:".
+function errorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  if (error.message) return error.message;
+  if (error.name === 'NotAutenticatedError') {
+    return 'not logged in to the tracking service';
+  }
+  return error.name;
+}
+
 export async function handleMessage(request: JsonRpcRequest): Promise<JsonRpcResponse> {
   const { method, params, id } = request;
 
@@ -97,10 +108,9 @@ export async function handleMessage(request: JsonRpcRequest): Promise<JsonRpcRes
 
     return { jsonrpc: '2.0', result, id };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
     return {
       jsonrpc: '2.0',
-      error: { code: -32603, message },
+      error: { code: -32603, message: errorMessage(error) },
       id,
     };
   }

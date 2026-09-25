@@ -1,0 +1,7 @@
+{
+  "name": "vue",
+  "version": "0.0.0",
+  "description": "Stub for the Vue entry points malsync's provider code imports. The sync server does not render Vue components.",
+  "main": "index.js",
+  "license": "GPL-3.0"
+}

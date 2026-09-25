@@ -171,7 +171,8 @@ class _MalSyncScreenState extends State<MalSyncScreen> {
       return _MalSyncMessage(
         icon: Icons.cloud_off,
         title: 'Could not load the list',
-        detail: _error!,
+        // The bridge's own words, without Dart's "Exception: " in front.
+        detail: _error!.replaceFirst(RegExp(r'^Exception: '), ''),
         action: ('Try again', _load),
       );
     }
