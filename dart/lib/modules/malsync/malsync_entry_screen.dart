@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:yuri_reader/modules/malsync/malsync_screen.dart';
@@ -7,14 +5,12 @@ import 'package:yuri_reader/modules/malsync/malsync_style.dart';
 import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';
 import 'package:yuri_reader/utils/cached_network.dart';
 
-/// One entry's own page, the way MAL-Sync's app shows it: the cover, the state
-/// it is in, and the progress, status and score controls that write back
-/// through the bridge.
-///
-/// The controls are its app's (`overview-update-ui`): a progress count with a
-/// step button and a slider, a status dropdown with the state dots, and a
-/// score. Changes go to the bridge as they are made, the same way its app
-/// saves them.
+/// One entry's own page, laid out the way MAL-Sync's app lays it out: the
+/// cover and the controls in a 300px column beside the title once the window
+/// is wide enough, and stacked on a narrow one. The controls are its
+/// `overview-update-ui` - a progress count with a step mark, a slider, volume
+/// for manga, the status pill and the score - and each saves through the
+/// bridge as it changes, which is how its app saves them.
 class MalSyncEntryScreen extends StatefulWidget {
   const MalSyncEntryScreen({
     super.key,
@@ -43,9 +39,7 @@ class _MalSyncEntryScreenState extends State<MalSyncEntryScreen> {
   String get _title => '${widget.entry['title'] ?? ''}';
   int get _total => (widget.entry['total'] as num?)?.toInt() ?? 0;
   int get _totalVolume => (widget.entry['totalVolume'] as num?)?.toInt() ?? 0;
-  bool get _isManga =>
-      (_url.contains('manga') && !_url.contains('anime')) ||
-      widget.isManga;
+  bool get _isManga => widget.isManga;
 
   @override
   void initState() {
@@ -65,8 +59,8 @@ class _MalSyncEntryScreenState extends State<MalSyncEntryScreen> {
     super.dispose();
   }
 
-  /// Writes what changed. The bridge takes the entry's URL, so no id is needed
-  /// and a failed write leaves the field where it was.
+  /// Writes what changed. The bridge takes the entry's URL, so no id is
+  /// needed; a failed write puts the field back where it was.
   Future<void> _save({
     int? progress,
     int? volume,
@@ -122,14 +116,13 @@ class _MalSyncEntryScreenState extends State<MalSyncEntryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final image = '${widget.entry['image'] ?? ''}';
     return Scaffold(
       backgroundColor: MalSyncStyle.background(context),
       appBar: AppBar(
         backgroundColor: MalSyncStyle.background(context),
         foregroundColor: MalSyncStyle.text(context),
         elevation: 0,
-        title: Text(_title, overflow: TextOverflow.ellipsis),
+        title: const Text('MAL-Sync'),
         actions: [
           if (_saving)
             const Padding(
@@ -142,263 +135,401 @@ class _MalSyncEntryScreenState extends State<MalSyncEntryScreen> {
                 ),
               ),
             ),
-          IconButton(
-            tooltip: 'Open on the site',
-            icon: const Icon(Icons.open_in_new),
-            onPressed: _url.isEmpty ? null : () => launchUrl(Uri.parse(_url)),
-          ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: MalSyncStyle.spacer),
-        children: [
-          if (image.isNotEmpty)
-            Stack(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide =
+              constraints.maxWidth >= MalSyncStyle.overviewBreakpoint;
+          final image = '${widget.entry['image'] ?? ''}';
+          final controls = <Widget>[
+            _progressSection(),
+            if (_isManga) _volumeSection(),
+            _statusSection(),
+            _scoreSection(),
+          ];
+          if (wide) {
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(
+                MalSyncStyle.sectionGap,
+                MalSyncStyle.sectionGap,
+                MalSyncStyle.sectionGap,
+                MalSyncStyle.sectionGap,
+              ),
               children: [
-                Image(
-                  image: coverProvider(image),
-                  height: 260,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const SizedBox(height: 0),
-                ),
-                // Their overview fades the cover into the page.
-                const Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: 120,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Color(0xD9242424)],
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: MalSyncStyle.overviewColumnWidth,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _cover(image, height: null),
+                          const SizedBox(height: MalSyncStyle.sectionGap),
+                          ...controls,
+                        ],
                       ),
                     ),
-                  ),
-                ),
-                Positioned(
-                  left: MalSyncStyle.spacerHalf,
-                  right: MalSyncStyle.spacerHalf,
-                  bottom: MalSyncStyle.spacerHalf,
-                  child: Row(
-                    children: [
-                      MalSyncStateDot(state: _status),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: MalSyncStyle.largeText,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                    const SizedBox(width: MalSyncStyle.sectionGap),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [_header(), const _Divider()],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
-            ),
-          Padding(
-            padding: const EdgeInsets.all(MalSyncStyle.spacerHalf),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildProgress(),
-                if (_isManga) ...[
-                  const SizedBox(height: MalSyncStyle.spacer),
-                  _buildVolume(),
-                ],
-                const SizedBox(height: MalSyncStyle.spacer),
-                _buildStatus(),
-                const SizedBox(height: MalSyncStyle.spacer),
-                _buildScore(),
-              ],
-            ),
-          ),
-        ],
+            );
+          }
+          return ListView(
+            children: [
+              _cover(image, height: 200),
+              Padding(
+                padding: const EdgeInsets.all(MalSyncStyle.spacerHalf),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _header(),
+                    const _Divider(),
+                    ...controls,
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildProgress() {
-    // With no total there is nothing to slide along, so the field and the
-    // step button are the whole control.
-    final max = (_total > 0 ? _total : (_progress > 0 ? _progress + 10 : 10))
-        .toDouble();
-    return Column(
+  /// Their `overviewImage`: a 10px-cornered card with a soft shadow, the whole
+  /// 225 by 350 cover once the column has the room for it.
+  Widget _cover(String image, {required double? height}) {
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(MalSyncStyle.controlRadius),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x11000000),
+            blurRadius: 21,
+            offset: Offset(0, 11),
+          ),
+          BoxShadow(
+            color: Color(0x1A000000),
+            blurRadius: 8,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(MalSyncStyle.controlRadius),
+        child: image.isEmpty
+            ? const SizedBox.shrink()
+            : height != null
+            ? Image(
+                image: coverProvider(image),
+                height: height,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              )
+            : AspectRatio(
+                aspectRatio: MalSyncStyle.coverAspectRatio,
+                child: Image(
+                  image: coverProvider(image),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
+              ),
+      ),
+    );
+  }
+
+  /// Their header: the state dot, then the title at 1.5x, and a way out to the
+  /// site. Their app swaps the dot for an `open_in_new` mark on hover; there
+  /// is no hover on a touch screen, so both are always shown.
+  Widget _header() {
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              _isManga ? 'Chapter' : 'Episode',
-              style: TextStyle(color: MalSyncStyle.lightText(context)),
-            ),
-            const Spacer(),
-            SizedBox(
-              width: 90,
-              child: _MalSyncNumberField(
-                controller: _progressController,
-                onSubmitted: (value) => _save(progress: value),
-              ),
-            ),
-            Text(
-              ' / ${_total > 0 ? _total : '?'}',
-              style: TextStyle(color: MalSyncStyle.lightText(context)),
-            ),
-            IconButton(
-              tooltip: 'One more',
-              icon: const Icon(Icons.add),
-              onPressed: () => _save(progress: _progress + 1),
-            ),
-          ],
+        Padding(
+          padding: const EdgeInsets.only(top: 7),
+          child: MalSyncStateDot(state: _status),
         ),
-        Slider(
-          value: _progress.clamp(0, max.toInt()).toDouble(),
-          max: max,
-          divisions: max.toInt(),
-          label: '$_progress',
-          onChanged: _total > 0
-              ? (value) => setState(() {
-                  _progress = value.round();
-                  _progressController.text = '$_progress';
-                })
-              : null,
-          onChangeEnd: _total > 0 ? (value) => _save(progress: value.round()) : null,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildVolume() {
-    final max = (_totalVolume > 0
-            ? _totalVolume
-            : (_volume > 0 ? _volume + 10 : 10))
-        .toDouble();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text('Volume', style: TextStyle(color: MalSyncStyle.lightText(context))),
-            const Spacer(),
-            SizedBox(
-              width: 90,
-              child: _MalSyncNumberField(
-                controller: _volumeController,
-                onSubmitted: (value) => _save(volume: value),
-              ),
-            ),
-            Text(
-              ' / ${_totalVolume > 0 ? _totalVolume : '?'}',
-              style: TextStyle(color: MalSyncStyle.lightText(context)),
-            ),
-            IconButton(
-              tooltip: 'One more',
-              icon: const Icon(Icons.add),
-              onPressed: () => _save(volume: _volume + 1),
-            ),
-          ],
-        ),
-        Slider(
-          value: _volume.clamp(0, max.toInt()).toDouble(),
-          max: max,
-          divisions: max.toInt(),
-          label: '$_volume',
-          onChanged: _totalVolume > 0
-              ? (value) => setState(() {
-                  _volume = value.round();
-                  _volumeController.text = '$_volume';
-                })
-              : null,
-          onChangeEnd:
-              _totalVolume > 0 ? (value) => _save(volume: value.round()) : null,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatus() {
-    return Row(
-      children: [
-        Text('Status', style: TextStyle(color: MalSyncStyle.lightText(context))),
-        const Spacer(),
-        MalSyncStateDropdown(
-          state: _status,
-          isManga: _isManga,
-          onChanged: (state) => _save(status: state),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildScore() {
-    return Row(
-      children: [
-        Text('Score', style: TextStyle(color: MalSyncStyle.lightText(context))),
-        const Spacer(),
-        DropdownButton<int>(
-          value: _score > 0 && _score <= 10 ? _score : null,
-          hint: Text(
-            'Not scored',
+        Expanded(
+          child: Text(
+            _title,
             style: TextStyle(
-              color: MalSyncStyle.lightText(context),
+              color: MalSyncStyle.text(context),
+              fontSize: MalSyncStyle.largeText,
+              fontWeight: FontWeight.w500,
+              height: 1.25,
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Open on the site',
+          icon: Icon(
+            Icons.open_in_new,
+            size: 20,
+            color: MalSyncStyle.secondary,
+          ),
+          onPressed: _url.isEmpty ? null : () => launchUrl(Uri.parse(_url)),
+        ),
+      ],
+    );
+  }
+
+  Widget _progressSection() {
+    return _Section(
+      label: _isManga ? 'Chapter' : 'Episode',
+      field: _countField(
+        controller: _progressController,
+        suffix: '/ ${_total > 0 ? _total : '?'}',
+        onSubmitted: (value) => _save(progress: value),
+      ),
+      onIncrease: () => _save(progress: _progress + 1),
+      value: _progress,
+      max: _total,
+      onSlide: (value) => setState(() {
+        _progress = value;
+        _progressController.text = '$_progress';
+      }),
+      onSlideEnd: (value) => _save(progress: value),
+    );
+  }
+
+  Widget _volumeSection() {
+    return _Section(
+      label: 'Volume',
+      field: _countField(
+        controller: _volumeController,
+        suffix: '/ ${_totalVolume > 0 ? _totalVolume : '?'}',
+        onSubmitted: (value) => _save(volume: value),
+      ),
+      onIncrease: () => _save(volume: _volume + 1),
+      value: _volume,
+      max: _totalVolume,
+      onSlide: (value) => setState(() {
+        _volume = value;
+        _volumeController.text = '$_volume';
+      }),
+      onSlideEnd: (value) => _save(volume: value),
+    );
+  }
+
+  Widget _statusSection() {
+    return _Section(
+      label: 'Status',
+      trailing: MalSyncStateDropdown(
+        state: _status,
+        isManga: _isManga,
+        onChanged: (state) => _save(status: state),
+      ),
+    );
+  }
+
+  Widget _scoreSection() {
+    return _Section(
+      label: 'Score',
+      trailing: Container(
+        height: MalSyncStyle.pillHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: MalSyncStyle.control(
+          context,
+          radius: MalSyncStyle.pillRadius,
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<int>(
+            value: _score > 0 && _score <= 10 ? _score : null,
+            hint: Text(
+              'Not scored',
+              style: TextStyle(
+                color: MalSyncStyle.lightText(context),
+                fontSize: MalSyncStyle.smallText,
+              ),
+            ),
+            dropdownColor: MalSyncStyle.foreground(context),
+            style: TextStyle(
+              color: MalSyncStyle.text(context),
               fontSize: MalSyncStyle.smallText,
             ),
+            items: [
+              for (var value = 0; value <= 10; value++)
+                DropdownMenuItem(
+                  value: value,
+                  child: Text(value == 0 ? 'Clear' : '$value'),
+                ),
+            ],
+            onChanged: (value) {
+              if (value != null) _save(score: value);
+            },
           ),
-          underline: const SizedBox.shrink(),
-          dropdownColor: MalSyncStyle.foreground(context),
-          style: TextStyle(
-            color: MalSyncStyle.text(context),
-            fontSize: MalSyncStyle.smallText,
-          ),
-          items: [
-            for (var value = 0; value <= 10; value++)
-              DropdownMenuItem(
-                value: value,
-                child: Text(value == 0 ? 'Clear' : '$value'),
-              ),
-          ],
-          onChanged: (value) {
-            if (value != null) _save(score: value);
-          },
         ),
-      ],
+      ),
+    );
+  }
+
+  /// Their `FormText`: the count and its total inside one 5px-cornered
+  /// outlined field. The count is written back when it is submitted, not on
+  /// every keystroke.
+  Widget _countField({
+    required TextEditingController controller,
+    required String suffix,
+    required ValueChanged<int> onSubmitted,
+  }) {
+    return Container(
+      decoration: MalSyncStyle.control(context, radius: MalSyncStyle.miniRadius),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 44,
+            child: TextField(
+              controller: controller,
+              textAlign: TextAlign.end,
+              keyboardType: TextInputType.number,
+              style: TextStyle(
+                color: MalSyncStyle.text(context),
+                fontSize: MalSyncStyle.baseFontSize,
+              ),
+              onSubmitted: (text) {
+                final value = int.tryParse(text.trim());
+                if (value != null && value >= 0) onSubmitted(value);
+              },
+              decoration: const InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+          Text(
+            ' $suffix',
+            style: TextStyle(
+              color: MalSyncStyle.lightText(context),
+              fontSize: MalSyncStyle.baseFontSize,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// Their progress and volume fields: the number, written back when it is
-/// submitted rather than on every keystroke.
-class _MalSyncNumberField extends StatelessWidget {
-  const _MalSyncNumberField({
-    required this.controller,
-    required this.onSubmitted,
+/// Their `Section`: a label row with the controls beside the label, and a
+/// slider under it, 15px apart on a 60px minimum.
+class _Section extends StatelessWidget {
+  const _Section({
+    required this.label,
+    this.field,
+    this.trailing,
+    this.onIncrease,
+    this.value,
+    this.max,
+    this.onSlide,
+    this.onSlideEnd,
   });
 
-  final TextEditingController controller;
-  final ValueChanged<int> onSubmitted;
+  final String label;
+  final Widget? field;
+  final Widget? trailing;
+  final VoidCallback? onIncrease;
+  final int? value;
+  final int? max;
+  final ValueChanged<int>? onSlide;
+  final ValueChanged<int>? onSlideEnd;
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      textAlign: TextAlign.end,
-      keyboardType: TextInputType.number,
-      style: TextStyle(
-        color: MalSyncStyle.text(context),
-        fontSize: MalSyncStyle.baseFontSize,
+    final hasSlider = value != null && max != null;
+    // With no total there is nothing to slide along, so the count field and
+    // the step mark are the whole control.
+    final sliderMax = (max ?? 0) > 0
+        ? max!.toDouble()
+        : ((value ?? 0) > 0 ? (value! + 10).toDouble() : 10.0);
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 60),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: MalSyncStyle.spacerHalf),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(
+                bottom: MalSyncStyle.labelRowGap,
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(color: MalSyncStyle.lightText(context)),
+                  ),
+                  const SizedBox(width: MalSyncStyle.labelRowGap),
+                  ?field,
+                  if (onIncrease != null) ...[
+                    const SizedBox(width: MalSyncStyle.labelRowGap),
+                    GestureDetector(
+                      onTap: onIncrease,
+                      child: Text(
+                        '+',
+                        style: TextStyle(
+                          color: MalSyncStyle.lightText(context),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (trailing != null) ...[
+                    const Spacer(),
+                    trailing!,
+                  ],
+                ],
+              ),
+            ),
+            if (hasSlider)
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 6,
+                  activeTrackColor: MalSyncStyle.primary,
+                  inactiveTrackColor: MalSyncStyle.backdrop(context),
+                  thumbColor: MalSyncStyle.foreground(context),
+                  overlayShape: const RoundSliderOverlayShape(
+                    overlayRadius: 0,
+                  ),
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 9,
+                  ),
+                ),
+                child: Slider(
+                  value: value!.clamp(0, sliderMax.toInt()).toDouble(),
+                  max: sliderMax,
+                  divisions: sliderMax.toInt(),
+                  onChanged: (max ?? 0) > 0 ? (v) => onSlide?.call(v.round()) : null,
+                  onChangeEnd:
+                      (max ?? 0) > 0 ? (v) => onSlideEnd?.call(v.round()) : null,
+                ),
+              ),
+          ],
+        ),
       ),
-      onSubmitted: (text) {
-        final value = int.tryParse(text.trim());
-        if (value != null && value >= 0) onSubmitted(value);
-      },
-      decoration: const InputDecoration(isDense: true, border: InputBorder.none),
+    );
+  }
+}
+
+/// Their `HR`: a 2px rule in the backdrop colour, one spacer below it.
+class _Divider extends StatelessWidget {
+  const _Divider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 2,
+      margin: const EdgeInsets.only(bottom: MalSyncStyle.sectionGap),
+      color: MalSyncStyle.backdrop(context),
     );
   }
 }
