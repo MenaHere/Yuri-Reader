@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:yuri_reader/modules/malsync/malsync_entry_screen.dart';
 import 'package:yuri_reader/modules/malsync/malsync_settings_screen.dart';
 import 'package:yuri_reader/modules/malsync/malsync_style.dart';
@@ -168,12 +169,22 @@ class _MalSyncScreenState extends State<MalSyncScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) {
+      final detail = _error!.replaceFirst(RegExp(r'^Exception: '), '');
+      // The bridge's one common failure here is having no login at all, and
+      // that is fixed in the tracking settings, so send the user there rather
+      // than leaving them with a message and a retry.
+      final needsLogin = detail.contains('not logged in');
       return _MalSyncMessage(
-        icon: Icons.cloud_off,
-        title: 'Could not load the list',
-        // The bridge's own words, without Dart's "Exception: " in front.
-        detail: _error!.replaceFirst(RegExp(r'^Exception: '), ''),
+        icon: needsLogin ? Icons.link_off : Icons.cloud_off,
+        title: needsLogin ? 'Not logged in' : 'Could not load the list',
+        detail: needsLogin
+            ? 'Log in to MyAnimeList or AniList under Tracking, and the '
+                  'tracked list fills up.'
+            : detail,
         action: ('Try again', _load),
+        secondAction: needsLogin
+            ? ('Open tracking settings', () async => context.push('/track'))
+            : null,
       );
     }
     final entries = _visible;
@@ -497,12 +508,14 @@ class _MalSyncMessage extends StatelessWidget {
     required this.title,
     this.detail,
     this.action,
+    this.secondAction,
   });
 
   final IconData icon;
   final String title;
   final String? detail;
   final (String, Future<void> Function())? action;
+  final (String, Future<void> Function())? secondAction;
 
   @override
   Widget build(BuildContext context) {
@@ -530,11 +543,22 @@ class _MalSyncMessage extends StatelessWidget {
                 ),
               ),
             ],
-            if (action != null) ...[
+            if (secondAction != null || action != null) ...[
               const SizedBox(height: MalSyncStyle.spacerHalf),
-              TextButton(
-                onPressed: () => action!.$2(),
-                child: Text(action!.$1),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (secondAction != null)
+                    FilledButton(
+                      onPressed: () => secondAction!.$2(),
+                      child: Text(secondAction!.$1),
+                    ),
+                  if (action != null)
+                    TextButton(
+                      onPressed: () => action!.$2(),
+                      child: Text(action!.$1),
+                    ),
+                ],
               ),
             ],
           ],
