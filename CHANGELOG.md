@@ -1,5 +1,13 @@
 # Yuri-Reader - Change Log
 
+## Version 0.5.2
+
+### [2026-09-25]
+
+#### Added
+- MAL-Sync has a tab of its own in the main navigation, between Browse and More, opening the same screen the gear on the Tracking row opens. It is in the desktop rail and the phone bar, and it opens over the current tab instead of becoming one, so the tab that was selected stays selected
+- The fork overlaid `main_view/main_screen.dart`, `appearance/custom_navigation_settings.dart` and `reader/providers/reader_state_provider.dart` to place it and to name it. A navigation item added since the order was last saved now goes where the default order puts it, instead of at the end of the rail
+
 ## Version 0.5.1
 
 ### [2026-09-25]
