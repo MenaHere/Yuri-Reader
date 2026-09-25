@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:yuri_reader/modules/malsync/malsync_entry_screen.dart';
 import 'package:yuri_reader/modules/malsync/malsync_settings_screen.dart';
 import 'package:yuri_reader/modules/malsync/malsync_style.dart';
 import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';
@@ -199,8 +199,26 @@ class _MalSyncScreenState extends State<MalSyncScreen> {
         childAspectRatio: 350 / 240,
       ),
       itemCount: entries.length,
-      itemBuilder: (context, index) =>
-          MalSyncEntryCard(entry: entries[index], isManga: _isManga),
+      itemBuilder: (context, index) {
+        final entry = entries[index];
+        return MalSyncEntryCard(
+          entry: entry,
+          isManga: _isManga,
+          // Their cards open the entry's own page, so progress and status can
+          // be changed there; the list is re-read when it closes.
+          onTap: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => MalSyncEntryScreen(
+                  entry: entry,
+                  isManga: _isManga,
+                ),
+              ),
+            );
+            if (mounted) _load();
+          },
+        );
+      },
     );
   }
 }
@@ -343,16 +361,17 @@ class MalSyncEntryCard extends StatelessWidget {
     super.key,
     required this.entry,
     required this.isManga,
+    this.onTap,
   });
 
   final Map<String, dynamic> entry;
   final bool isManga;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final title = '${entry['title'] ?? ''}';
     final image = '${entry['image'] ?? ''}';
-    final url = '${entry['url'] ?? ''}';
     final progress = entry['progress'] ?? 0;
     final total = entry['total'] ?? 0;
     final score = entry['score'] ?? 0;
@@ -364,7 +383,7 @@ class MalSyncEntryCard extends StatelessWidget {
       child: Material(
         color: MalSyncStyle.foreground(context),
         child: InkWell(
-          onTap: url.isEmpty ? null : () => launchUrl(Uri.parse(url)),
+          onTap: onTap,
           child: Stack(
             fit: StackFit.expand,
             children: [

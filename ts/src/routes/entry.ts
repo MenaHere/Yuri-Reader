@@ -19,6 +19,8 @@ function listEntryToJson(entry: listElement): Record<string, unknown> {
     score: entry.score,
     progress: isAnime ? entry.watchedEp : entry.readVol ?? 0,
     total: isAnime ? entry.totalEp : entry.totalVol ?? 0,
+    volume: isAnime ? null : entry.readVol ?? 0,
+    totalVolume: isAnime ? null : entry.totalVol ?? 0,
     status: entry.status,
     startDate: entry.startDate,
     finishDate: entry.finishDate,
