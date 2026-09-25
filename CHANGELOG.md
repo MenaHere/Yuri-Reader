@@ -1,5 +1,12 @@
 # Yuri-Reader - Change Log
 
+## Version 0.5.4
+
+### [2026-09-25]
+
+#### Fixed
+- Only one of the two sync paths writes progress now. Reading a chapter called both the MAL-Sync bridge and the app's own trackers, and the two read the chapter number differently - the bridge searches by title, the trackers use this app's recognition - so the same title was pushed twice and the two views could end up disagreeing about it. When MAL-Sync is enabled it owns that update and the native trackers are left to it
+
 ## Version 0.5.3
 
 ### [2026-09-25]
