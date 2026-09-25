@@ -14,30 +14,48 @@ class YuriSyncService {
 
   final YuriSyncSpawner _spawner = YuriSyncSpawner();
   YuriSyncClient? _client;
-  bool _starting = false;
-  final _initCompleter = Completer<void>();
+  Completer<void>? _starting;
 
   /// Whether the service is ready for JSON-RPC calls.
   bool get isReady => _client != null;
 
-  /// Returns a future that completes once the service is initialized.
-  Future<void> get initialized => _initCompleter.future;
+  /// Returns a future that completes once the service is initialized, starting
+  /// it if needed.
+  Future<void> get initialized => ensureInitialized();
 
   /// Start the binary, connect the TCP client, and return when ready.
   Future<void> ensureInitialized() async {
     if (_client != null) return;
-    if (_starting) return _initCompleter.future;
-    _starting = true;
+    final inFlight = _starting;
+    if (inFlight != null) return inFlight.future;
 
+    final starting = Completer<void>();
+    _starting = starting;
     try {
       final port = await _spawner.start();
-      _client = YuriSyncClient(port: port);
-      await _client!.connect();
-      _initCompleter.complete();
-    } catch (e) {
-      _starting = false;
-      if (!_initCompleter.isCompleted) _initCompleter.completeError(e);
+      final client = YuriSyncClient(port: port);
+      await client.connect();
+      _client = client;
+      // A dead service cannot answer on that socket. Dropping the client when
+      // it exits means the next call starts a fresh one, instead of writing
+      // into a dead pipe and waiting for a reply that cannot come.
+      unawaited(
+        _spawner.exitCode.then((_) {
+          if (identical(_client, client)) {
+            client.disconnect();
+            _client = null;
+          }
+        }),
+      );
+      starting.complete();
+    } catch (error, stack) {
+      // A failed start must not be permanent: the next call tries again, so
+      // this future is not what callers keep looking at.
+      starting.future.ignore();
+      starting.completeError(error, stack);
       rethrow;
+    } finally {
+      _starting = null;
     }
   }
 

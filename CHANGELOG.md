@@ -1,5 +1,12 @@
 # Yuri-Reader - Change Log
 
+## Version 0.4.2
+
+### [2026-09-25]
+
+#### Fixed
+- The MAL-Sync screen loads instead of spinning. The app read the service's start-up line by returning out of the loop over its output, and returning closes that pipe; the service writes its log there, so its first log line killed it in the middle of the request and no reply ever came. The app now keeps reading both pipes for as long as the service runs, reports a service that dies before it is ready instead of waiting, and drops a dead service so the next attempt starts a fresh one instead of writing into a closed socket
+
 ## Version 0.4.1
 
 ### [2026-09-25]

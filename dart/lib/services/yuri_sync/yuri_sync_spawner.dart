@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -13,18 +14,54 @@ class YuriSyncSpawner {
 
     _process = await Process.start(binaryPath, []);
 
-    // Listen for READY:PORT message on stdout
-    await for (final line
-        in _process!.stdout.transform(utf8.decoder).transform(LineSplitter())) {
-      final match = RegExp(r'^READY:(\d+)$').firstMatch(line);
-      if (match != null) {
-        _port = int.parse(match.group(1)!);
-        return _port!;
-      }
-    }
+    final ready = Completer<int>();
 
-    throw Exception('Yuri-Sync did not report ready');
+    // Both pipes are drained for as long as the child lives, and the
+    // subscription is never cancelled. Leaving this loop as soon as the READY
+    // line arrived used to close the child's stdout, and the service logs its
+    // work there: the first log after that write raised EPIPE and killed it in
+    // the middle of a request. stderr is drained for the same reason - if it
+    // fills, the child blocks on its own log.
+    _process!.stdout
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen(
+      (line) {
+        final match = RegExp(r'^READY:(\d+)$').firstMatch(line);
+        if (match != null && !ready.isCompleted) {
+          _port = int.parse(match.group(1)!);
+          ready.complete(_port!);
+        }
+      },
+      onError: (Object _) {},
+      onDone: () {
+        if (!ready.isCompleted) {
+          ready.completeError(Exception('Yuri-Sync did not report ready'));
+        }
+      },
+    );
+    _process!.stderr
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen(debugPrint, onError: (Object _) {}, onDone: () {});
+
+    // Dying before it is ready must be reported, not waited on.
+    unawaited(
+      _process!.exitCode.then((code) {
+        if (!ready.isCompleted) {
+          ready.completeError(
+            Exception('Yuri-Sync exited before it was ready (code $code)'),
+          );
+        }
+      }),
+    );
+
+    return ready.future;
   }
+
+  /// Completes when the service process ends, so a caller can stop waiting on
+  /// a socket that will never answer.
+  Future<int> get exitCode async => (await _process?.exitCode) ?? -1;
 
   Future<String> _getBinaryPath() async {
     if (Platform.isAndroid || Platform.isIOS) {
