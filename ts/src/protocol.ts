@@ -10,6 +10,7 @@ import {
   handleEntryDelete,
   handleEntryList,
 } from './routes/entry';
+import { handleEntryMeta } from './routes/meta';
 import { handleTrackAuto } from './routes/track';
 
 export interface JsonRpcRequest {
@@ -73,6 +74,9 @@ export async function handleMessage(request: JsonRpcRequest): Promise<JsonRpcRes
         break;
       case 'entry.list':
         result = await handleEntryList(params || {});
+        break;
+      case 'entry.meta':
+        result = await handleEntryMeta(params || {});
         break;
       case 'entry.update':
         result = await handleEntryUpdate(params || {});

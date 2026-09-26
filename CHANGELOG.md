@@ -1,5 +1,13 @@
 # Yuri-Reader - Change Log
 
+## Version 0.5.5
+
+### [2026-09-25]
+
+#### Added
+- The entry page shows what the site says about a title, not only our controls: the score, favourites, popularity and rank row; the description; a "Synonyms" button listing every other name it goes by; the cast with covers and roles; related titles; recommendations with how many people made them; reviews; and the details list (format, status, start date, authors, source, genres, external links). It is MAL-Sync's own title data, read by the provider class the sync mode already selects, so nothing is fetched or reshaped twice; a section the provider has nothing for is simply not there
+- The bridge gained `entry.meta` for it, which returns the same title data MAL-Sync's own page is built from
+
 ## Version 0.5.4
 
 ### [2026-09-25]

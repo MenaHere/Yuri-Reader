@@ -156,6 +156,26 @@ class YuriSyncService {
     return (result['results'] as List).cast<Map<String, dynamic>>();
   }
 
+  /// What the site itself says about an entry: description, score and
+  /// popularity, other names, cast, related and recommended titles, reviews,
+  /// and the details list. [url] is the entry's page on the provider.
+  Future<Map<String, dynamic>> entryMeta({
+    required String url,
+    required String type,
+    String? provider,
+  }) async {
+    final response = await _call('entry.meta', {
+      'url': url,
+      'type': type,
+      'provider': provider,
+    });
+    if (response['error'] != null) {
+      throw Exception('entry.meta failed: ${response['error']['message']}');
+    }
+    final result = response['result'] as Map<String, dynamic>;
+    return result['meta'] as Map<String, dynamic>;
+  }
+
   /// The settings the bridge holds. Credentials are left out.
   Future<Map<String, dynamic>> settingsList() async {
     final response = await _call('settings.list', {});
