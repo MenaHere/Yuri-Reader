@@ -1,17 +1,14 @@
 # Yuri-Reader - Change Log
 
-## Unreleased
+## Version 0.5.7
 
 ### [2026-09-26]
 
 #### Bot
 - [2026-09-26] Synced 13 commits from [mangayomi](https://github.com/kodjodevf/mangayomi), 32 commits from [malsync](https://github.com/MALSync/MALSync)
 
-## Version 0.5.7
-
-### [2026-09-26]
-
 #### Fixed
+- The reader follows upstream's new page-loaded callback. The sync added a required one to the page content widget, which this fork's copy of the reader did not pass, so the synced tree did not build - neither the bot's own run nor 0.5.7 could finish. This fork's reader now answers it, making its remembered-page jump only once that page's image has loaded
 - The title data reads its own wording. Where MAL-Sync builds a string for itself - a run time, a status, a date - the service answered with the key it looked the text up by, so an anime's duration showed as `bookmarkitems_min` and the details list showed its labels as keys. It now reads MAL-Sync's own English text, which the service carries with it
 - Recommendations are gone from the entry page
 
