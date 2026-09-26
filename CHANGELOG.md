@@ -1,5 +1,17 @@
 # Yuri-Reader - Change Log
 
+## Version 0.6.0
+
+### [2026-09-26]
+
+#### Added
+- A manga's page carries MAL-Sync's own panel, in the band under the title block and above the action row: the rating it shows for the title, then Status, Volume, Chapter and Your Score, each saving as it changes. It is one wrapping row, so on a narrow window the second line starts at the left edge instead of in the middle. It appears for manga and novels, and only while MAL-Sync is one of the trackers
+- The Tracking button on that page becomes MAL-Sync's: it takes the arrow mark, and opens its correction panel - the entry the title matched, and a search to pick a different one when the automatic title match landed on the wrong title. A hand-picked match is kept on the title's MAL-Sync row, and the panel reads it back on the next visit
+- The bridge gained `entry.find`: a read-only lookup, by title or by a hand-picked entry, which is what the panel reads. It never adds a status, a progress or an entry, so opening a page cannot change the list
+
+#### Fixed
+- Entry reads and writes finished with an error, and the write never ran. The service stands in for a browser extension, and its stand-in storage returned nothing where the vendored code waits on a promise, so every provider update threw on the way out. Opening an entry, saving a score, a status or progress, adding or deleting an entry, and the reader's own automatic tracking all reported an error and stopped there. The stand-in now settles its promises, so they finish; released 0.5.7 carries the fault
+
 ## Version 0.5.7
 
 ### [2026-09-26]

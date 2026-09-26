@@ -28,6 +28,47 @@ import { j } from './jquery';
   },
 };
 
+/// A promise-returning, in-memory stand-in for one `chrome.storage` area.
+///
+/// The vendored code is written for a browser extension, where `get`, `set` and
+/// `remove` return promises and the caller chains `.catch` onto them. The
+/// service keeps its own settings in `~/.yuri-sync`, so this area is only the
+/// extension's scratch space: accept the write, remember it for the life of the
+/// process, and settle the promise the caller awaits. Plain functions that
+/// returned nothing made every call which emits an update throw
+/// `Cannot read properties of undefined (reading 'catch')`, after the provider
+/// had already been updated.
+function memoryStorageArea(area: Record<string, unknown>) {
+  const keyList = (keys: unknown): string[] => {
+    if (typeof keys === 'string') return [keys];
+    if (Array.isArray(keys)) return keys.map(String);
+    if (keys && typeof keys === 'object') return Object.keys(keys as object);
+    return [];
+  };
+  return {
+    get: (keys?: unknown) => {
+      if (keys == null) return Promise.resolve({ ...area });
+      const found: Record<string, unknown> = {};
+      for (const key of keyList(keys)) {
+        if (key in area) found[key] = area[key];
+      }
+      return Promise.resolve(found);
+    },
+    set: (items: Record<string, unknown>) => {
+      Object.assign(area, items ?? {});
+      return Promise.resolve();
+    },
+    remove: (keys: unknown) => {
+      for (const key of keyList(keys)) delete area[key];
+      return Promise.resolve();
+    },
+    clear: () => {
+      for (const key of Object.keys(area)) delete area[key];
+      return Promise.resolve();
+    },
+  };
+}
+
 // chrome runtime stub
 (global as any).chrome = {
   runtime: {
@@ -38,8 +79,8 @@ import { j } from './jquery';
     lastError: null,
   },
   storage: {
-    local: { get: () => {}, set: () => {}, remove: () => {} },
-    sync: { get: () => {}, set: () => {}, remove: () => {} },
+    local: memoryStorageArea({}),
+    sync: memoryStorageArea({}),
     onChanged: { addListener: () => {} },
   },
   i18n: {

@@ -176,6 +176,50 @@ class YuriSyncService {
     return result['meta'] as Map<String, dynamic>;
   }
 
+  /// The entry a title currently matches, without changing the list.
+  ///
+  /// This is what a title's own page asks when it opens, so it can show that
+  /// title's controls: it searches by title and reads, and never adds a status,
+  /// a progress or an entry. Pass [url] for a match the user picked by hand;
+  /// that one wins over a fresh title search. The reply carries the entry (or
+  /// `found: false`), the rating the service shows and the option lists its own
+  /// dropdowns use.
+  Future<Map<String, dynamic>> entryFind({
+    required String title,
+    required String type,
+    String? url,
+    String? provider,
+  }) async {
+    final response = await _call('entry.find', {
+      'title': title,
+      'type': type,
+      'url': url,
+      'provider': provider,
+    });
+    if (response['error'] != null) {
+      throw Exception('entry.find failed: ${response['error']['message']}');
+    }
+    return response['result'] as Map<String, dynamic>;
+  }
+
+  /// The service's own title search, which the correction panel offers: the
+  /// same search the bridge uses to match a title, so the user can pick the
+  /// entry the automatic match got wrong.
+  Future<List<Map<String, dynamic>>> searchQuery({
+    required String query,
+    required String type,
+  }) async {
+    final response = await _call('search.query', {
+      'query': query,
+      'type': type,
+    });
+    if (response['error'] != null) {
+      throw Exception('search.query failed: ${response['error']['message']}');
+    }
+    final result = response['result'] as Map<String, dynamic>;
+    return (result['results'] as List).cast<Map<String, dynamic>>();
+  }
+
   /// The settings the bridge holds. Credentials are left out.
   Future<Map<String, dynamic>> settingsList() async {
     final response = await _call('settings.list', {});
