@@ -23,6 +23,18 @@ export function handleAuthExchange(params: Record<string, unknown>): Record<stri
   const token = params.token as string;
   const refreshToken = params.refreshToken as string;
 
+  // Signing in is what chooses the service, because it is the moment the user
+  // says which account they are on. Nothing else changes it.
+  const modes: Record<string, string> = {
+    anilist: 'ANILIST',
+    mal: 'MAL',
+    kitsu: 'KITSU',
+    simkl: 'SIMKL',
+    shikimori: 'SHIKI',
+    mangabaka: 'MANGABAKA',
+  };
+  if (modes[provider]) api.settings.set('syncMode', modes[provider]);
+
   // Store tokens in settings
   switch (provider) {
     case 'anilist':
