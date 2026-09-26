@@ -2,6 +2,7 @@
 
 import { getSingle } from '../../vendor/malsync/src/_provider/singleFactory';
 import { getList } from '../../vendor/malsync/src/_provider/listFactory';
+import { search } from '../../vendor/malsync/src/_provider/searchFactory';
 import type { listElement } from '../../vendor/malsync/src/_provider/listAbstract';
 import * as definitions from '../../vendor/malsync/src/_provider/definitions';
 import * as helper from '../../vendor/malsync/src/_provider/helper';
@@ -123,6 +124,53 @@ function singleToJson(single: any): Record<string, unknown> {
     onList: single.isOnList(),
     authenticated: single.isAuthenticated(),
     shortName: single.shortName,
+  };
+}
+
+/// The entry a title currently matches, without touching the account.
+///
+/// The app asks this when it opens a title's page, so it can show that title's
+/// controls. It searches and reads, and never adds a status, progress or entry:
+/// a page that is merely opened must not change the list. [provider] is not
+/// applied here for the same reason - only signing in switches the service.
+export async function handleEntryFind(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const provider = namedProvider(params);
+  const type = (params.type as 'anime' | 'manga') || 'anime';
+  const title = (params.title as string) || '';
+  // A match the user picked by hand wins over a fresh title search: that is
+  // what the app stores when the search picks the wrong title.
+  const chosen = (params.url as string) || '';
+
+  if (chosen) {
+    const single = getSingle(chosen);
+    await single.update();
+    return {
+      provider,
+      type,
+      found: true,
+      entry: singleToJson(single),
+      rating: await single.getRating(),
+      statusOptions: single.getStatusCheckbox(),
+      scoreOptions: single.getScoreCheckbox(),
+    };
+  }
+
+  if (!title) return { provider, type, found: false, entry: null };
+
+  const results = await search(title, type, {}, false, provider ?? '');
+  if (!results.length) return { provider, type, found: false, entry: null };
+
+  const single = getSingle(results[0].url);
+  await single.update();
+
+  return {
+    provider,
+    type,
+    found: true,
+    entry: singleToJson(single),
+    rating: await single.getRating(),
+    statusOptions: single.getStatusCheckbox(),
+    scoreOptions: single.getScoreCheckbox(),
   };
 }
 

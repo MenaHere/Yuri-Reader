@@ -4,6 +4,7 @@ import { handleAuthGetUrl, handleAuthExchange, handleAuthRefresh } from './route
 import { handleSettingsSet, handleSettingsGet, handleSettingsList } from './routes/settings';
 import { handleSearch } from './routes/search';
 import {
+  handleEntryFind,
   handleEntryGet,
   handleEntryUpdate,
   handleEntryAdd,
@@ -69,6 +70,9 @@ export async function handleMessage(request: JsonRpcRequest): Promise<JsonRpcRes
         result = await handleSearch(params || {});
         break;
 
+      case 'entry.find':
+        result = await handleEntryFind(params || {});
+        break;
       case 'entry.get':
         result = await handleEntryGet(params || {});
         break;
