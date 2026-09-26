@@ -1,5 +1,13 @@
 # Yuri-Reader - Change Log
 
+## Version 0.5.6
+
+### [2026-09-26]
+
+#### Fixed
+- Signing in decides which service the tracked list is read from, and nothing else does. Saving progress or score, or reading a chapter, fell back to MyAnimeList whenever the call did not name a service, and then wrote that fallback over the service already chosen - so an AniList login could look like being signed out. Signing in to a service now chooses it, and every other call keeps whatever is chosen
+- The tracked list says which service it is reading from, under its title, and the no-login message names it too, so a list that cannot load no longer looks the same as a login that is gone
+
 ## Version 0.5.5
 
 ### [2026-09-25]

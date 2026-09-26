@@ -140,4 +140,29 @@ abstract final class MalSyncStyle {
       borderRadius: BorderRadius.circular(radius),
     );
   }
+
+  /// Which account the tracked list is read from. The bridge calls this the
+  /// sync mode; the screen says the service's name, because that is what a
+  /// person recognises - and it is the difference between a list that fills up
+  /// and one that says it has no login.
+  static String serviceName(String mode) {
+    switch (mode.toUpperCase()) {
+      case 'MAL':
+        return 'MyAnimeList';
+      case 'ANILIST':
+        return 'AniList';
+      case 'KITSU':
+        return 'Kitsu';
+      case 'SIMKL':
+        return 'Simkl';
+      case 'SHIKI':
+        return 'Shikimori';
+      case 'MANGABAKA':
+        return 'MangaBaka';
+      case '':
+        return '';
+      default:
+        return mode;
+    }
+  }
 }

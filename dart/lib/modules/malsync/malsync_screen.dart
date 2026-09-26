@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:yuri_reader/modules/malsync/malsync_entry_screen.dart';
@@ -30,10 +32,16 @@ class _MalSyncScreenState extends State<MalSyncScreen> {
   String _query = '';
   final _searchController = TextEditingController();
 
+  /// Which service the list is read from, as the bridge has it. Shown next to
+  /// the title, because "no login" and "a different account" look identical
+  /// otherwise.
+  String _service = '';
+
   @override
   void initState() {
     super.initState();
     _load();
+    _loadService();
   }
 
   @override
@@ -47,6 +55,7 @@ class _MalSyncScreenState extends State<MalSyncScreen> {
       _loading = true;
       _error = null;
     });
+    unawaited(_loadService());
     try {
       final entries = await YuriSyncService().entryList(
         type: _isManga ? 'manga' : 'anime',
@@ -64,6 +73,16 @@ class _MalSyncScreenState extends State<MalSyncScreen> {
         _loading = false;
       });
     }
+  }
+
+  /// Which service the bridge is reading from, so the screen can say it. A
+  /// failure here is not shown: the list's own state covers it.
+  Future<void> _loadService() async {
+    try {
+      final settings = await YuriSyncService().settingsList();
+      if (!mounted) return;
+      setState(() => _service = '${settings['syncMode'] ?? ''}');
+    } catch (_) {}
   }
 
   /// Their list is searched client side too, so the search box does not
@@ -107,7 +126,21 @@ class _MalSyncScreenState extends State<MalSyncScreen> {
                   hintStyle: TextStyle(color: MalSyncStyle.lightText(context)),
                 ),
               )
-            : const Text('MAL-Sync'),
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('MAL-Sync'),
+                  if (_service.isNotEmpty)
+                    Text(
+                      MalSyncStyle.serviceName(_service),
+                      style: TextStyle(
+                        color: MalSyncStyle.lightText(context),
+                        fontSize: MalSyncStyle.smallText,
+                      ),
+                    ),
+                ],
+              ),
         actions: [
           if (!_searching)
             IconButton(
@@ -174,12 +207,15 @@ class _MalSyncScreenState extends State<MalSyncScreen> {
       // that is fixed in the tracking settings, so send the user there rather
       // than leaving them with a message and a retry.
       final needsLogin = detail.contains('not logged in');
+      final service = MalSyncStyle.serviceName(_service);
       return _MalSyncMessage(
         icon: needsLogin ? Icons.link_off : Icons.cloud_off,
-        title: needsLogin ? 'Not logged in' : 'Could not load the list',
+        title: needsLogin
+            ? (service.isEmpty ? 'Not signed in' : 'Not signed in to $service')
+            : 'Could not load the list',
         detail: needsLogin
-            ? 'Log in to MyAnimeList or AniList under Tracking, and the '
-                  'tracked list fills up.'
+            ? 'Sign in${service.isEmpty ? '' : ' to $service'} under Tracking, '
+                  'and the tracked list fills up.'
             : detail,
         action: ('Try again', _load),
         secondAction: needsLogin

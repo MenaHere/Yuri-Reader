@@ -4,7 +4,23 @@ import { getSingle } from '../../vendor/malsync/src/_provider/singleFactory';
 import { getList } from '../../vendor/malsync/src/_provider/listFactory';
 import type { listElement } from '../../vendor/malsync/src/_provider/listAbstract';
 import * as definitions from '../../vendor/malsync/src/_provider/definitions';
+import * as helper from '../../vendor/malsync/src/_provider/helper';
 import { api } from '../shim/api';
+
+/// A service is only ever switched when the caller names one. These calls used
+/// to fall back to MyAnimeList when nothing was named, and then wrote that
+/// fallback over the configured service - so saving progress, or opening an
+/// entry, could quietly move a user off the account they had chosen.
+function namedProvider(params: Record<string, unknown>): string | null {
+  const provider = params.provider;
+  return typeof provider === 'string' && provider ? provider : null;
+}
+
+/// The service a call ends up using, for the reply and for building a URL when
+/// the caller did not give one.
+function effectiveProvider(params: Record<string, unknown>, type: 'anime' | 'manga'): string {
+  return namedProvider(params) ?? helper.getSyncMode(type);
+}
 
 /// One entry of the tracked list, in the shape a list needs: what to draw
 /// (title, cover, progress) and how to open it (url, mediaId).
@@ -40,12 +56,12 @@ function listEntryToJson(entry: listElement): Record<string, unknown> {
 /// classes pick the configured one themselves. [provider] is only honoured
 /// when it is actually given.
 export async function handleEntryList(params: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const provider = typeof params.provider === 'string' && params.provider ? (params.provider as string) : null;
+  const provider = namedProvider(params);
   const type = (params.type as 'anime' | 'manga') || 'anime';
   const status =
     typeof params.status === 'number' ? (params.status as number) : definitions.status.All;
 
-  if (provider) await setSyncMode(provider);
+  await applyNamedProvider(params);
   const list = await getList(status, type);
   const entries = await list.getCompleteList();
 
@@ -68,6 +84,12 @@ function buildUrl(provider: string, type: 'anime' | 'manga', mediaId: string | n
     default:
       return malUrl(type, mediaId);
   }
+}
+
+/// Switches the service only when the caller named one.
+async function applyNamedProvider(params: Record<string, unknown>): Promise<void> {
+  const provider = namedProvider(params);
+  if (provider) await setSyncMode(provider);
 }
 
 async function setSyncMode(provider: string) {
@@ -105,24 +127,24 @@ function singleToJson(single: any): Record<string, unknown> {
 }
 
 export async function handleEntryGet(params: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const provider = (params.provider as string) || 'mal';
   const type = (params.type as 'anime' | 'manga') || 'anime';
+  const provider = effectiveProvider(params, type);
   const mediaId = params.mediaId as string | number;
   const url = (params.url as string) || buildUrl(provider, type, mediaId);
 
-  await setSyncMode(provider);
+  await applyNamedProvider(params);
   const single = getSingle(url);
   await single.update();
   return singleToJson(single);
 }
 
 export async function handleEntryUpdate(params: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const provider = (params.provider as string) || 'mal';
   const type = (params.type as 'anime' | 'manga') || 'anime';
+  const provider = effectiveProvider(params, type);
   const mediaId = params.mediaId as string | number;
   const url = (params.url as string) || buildUrl(provider, type, mediaId);
 
-  await setSyncMode(provider);
+  await applyNamedProvider(params);
   const single = getSingle(url);
   await single.update();
 
@@ -147,12 +169,12 @@ export async function handleEntryUpdate(params: Record<string, unknown>): Promis
 }
 
 export async function handleEntryAdd(params: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const provider = (params.provider as string) || 'mal';
   const type = (params.type as 'anime' | 'manga') || 'anime';
+  const provider = effectiveProvider(params, type);
   const mediaId = params.mediaId as string | number;
   const url = (params.url as string) || buildUrl(provider, type, mediaId);
 
-  await setSyncMode(provider);
+  await applyNamedProvider(params);
   const single = getSingle(url);
   await single.update();
 
@@ -169,12 +191,12 @@ export async function handleEntryAdd(params: Record<string, unknown>): Promise<R
 }
 
 export async function handleEntryDelete(params: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const provider = (params.provider as string) || 'mal';
   const type = (params.type as 'anime' | 'manga') || 'anime';
+  const provider = effectiveProvider(params, type);
   const mediaId = params.mediaId as string | number;
   const url = (params.url as string) || buildUrl(provider, type, mediaId);
 
-  await setSyncMode(provider);
+  await applyNamedProvider(params);
   const single = getSingle(url);
   await single.update();
   await single.delete();
