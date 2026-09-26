@@ -20,7 +20,6 @@ class MalSyncMetaSections extends StatelessWidget {
     final statistics = (meta['statistics'] as List?) ?? const [];
     final characters = (meta['characters'] as List?) ?? const [];
     final related = (meta['related'] as List?) ?? const [];
-    final recommendations = (meta['recommendations'] as List?) ?? const [];
     final reviews = (meta['reviews'] as List?) ?? const [];
     final altTitles = (meta['alternativeTitle'] as List?) ?? const [];
     final description = _plainText('${meta['description'] ?? ''}');
@@ -69,17 +68,6 @@ class MalSyncMetaSections extends StatelessWidget {
               children: [
                 for (final group in related)
                   _RelatedGroup(group: group as Map),
-              ],
-            ),
-          ),
-        ],
-        if (recommendations.isNotEmpty) ...[
-          MalSyncSection(
-            title: 'Recommendations',
-            child: MalSyncGrid(
-              children: [
-                for (final recommendation in recommendations)
-                  _Recommendation(recommendation: recommendation as Map),
               ],
             ),
           ),
@@ -386,95 +374,6 @@ class _RelatedGroup extends StatelessWidget {
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Their recommendation card: the cover with how many people recommend it, the
-/// name under it.
-class _Recommendation extends StatelessWidget {
-  const _Recommendation({required this.recommendation});
-
-  final Map recommendation;
-
-  @override
-  Widget build(BuildContext context) {
-    final entry = (recommendation['entry'] as Map?) ?? const {};
-    final stats = (recommendation['stats'] as Map?) ?? const {};
-    final image = '${entry['image'] ?? entry['imageLarge'] ?? ''}';
-    final url = '${entry['url'] ?? ''}';
-    final users = '${stats['users'] ?? ''}';
-    return GestureDetector(
-      onTap: url.isEmpty ? null : () => launchUrl(Uri.parse(url)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Stack(
-            children: [
-              AspectRatio(
-                aspectRatio: MalSyncStyle.coverAspectRatio,
-                child: ClipRRect(
-                  borderRadius:
-                      BorderRadius.circular(MalSyncStyle.controlRadius),
-                  child: image.isEmpty
-                      ? Container(color: MalSyncStyle.backdrop(context))
-                      : Image(
-                          image: coverProvider(image),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                        ),
-                ),
-              ),
-              if (users.isNotEmpty)
-                Positioned(
-                  top: MalSyncStyle.spacerHalf,
-                  left: MalSyncStyle.spacerHalf,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: MalSyncStyle.darkBackground(context),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.people_outline,
-                          size: 18,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          users,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: MalSyncStyle.smallText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: Text(
-              '${entry['title'] ?? ''}',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: MalSyncStyle.text(context),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
         ],
       ),
     );

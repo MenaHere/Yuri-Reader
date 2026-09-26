@@ -10,6 +10,114 @@ const DATA_DIR = path.join(os.homedir(), '.yuri-sync');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const STORAGE_FILE = path.join(DATA_DIR, 'storage.json');
 
+/// malsync's own English text, so every string it builds - a status, a
+/// duration, a date - is the text its app shows rather than the key it was
+/// looked up by. The file ships in the vendored tree, and the packaged binary
+/// carries it too (see `pkg.assets` in package.json).
+const MESSAGES_FILE = path.join(
+  __dirname,
+  '../../../vendor/malsync/assets/_locales/en/messages.json',
+);
+
+interface LocaleMessage {
+  message: string;
+  placeholders?: Record<string, { content: string }>;
+}
+
+let localeMessages: Record<string, LocaleMessage> | null = null;
+
+function loadLocaleMessages(): Record<string, LocaleMessage> {
+  if (localeMessages) return localeMessages;
+  try {
+    localeMessages = JSON.parse(fs.readFileSync(MESSAGES_FILE, 'utf-8'));
+  } catch {
+    // Without the file, the names below are all there is.
+    localeMessages = {};
+  }
+  return localeMessages!;
+}
+
+/// Text for the keys malsync's own English file does not carry: the fork's own
+/// messages rather than its, and the ones it invents while shimming.
+const langMap: Record<string, string> = {
+      'Error_Authenticate': 'Please authenticate with {0}',
+      'Error_Blocked': '{0} is blocked',
+      'UI_Status_watching_anime': 'Watching',
+      'UI_Status_watching_manga': 'Reading',
+      'UI_Status_Completed': 'Completed',
+      'UI_Status_OnHold': 'On Hold',
+      'UI_Status_Dropped': 'Dropped',
+      'UI_Status_planTo_anime': 'Plan to Watch',
+      'UI_Status_planTo_manga': 'Plan to Read',
+      'UI_Status_Rewatching_anime': 'Rewatching',
+      'UI_Status_Rewatching_manga': 'Rereading',
+      'UI_Status_Considering': 'Considering',
+      'UI_Status_All': 'All',
+      'UI_Episode': 'Episode',
+      'UI_Chapter': 'Chapter',
+      'UI_Score_Not_Rated': 'Not Rated',
+      'UI_Score_Masterpiece': 'Masterpiece',
+      'UI_Score_Great': 'Great',
+      'UI_Score_VeryGood': 'Very Good',
+      'UI_Score_Good': 'Good',
+      'UI_Score_Fine': 'Fine',
+      'UI_Score_Average': 'Average',
+      'UI_Score_Bad': 'Bad',
+      'UI_Score_VeryBad': 'Very Bad',
+      'UI_Score_Horrible': 'Horrible',
+      'UI_Score_Appalling': 'Appalling',
+      'list_sorting_alpha': 'Alphabetical',
+      'list_sorting_history': 'Last Updated',
+      'list_sorting_score': 'Score',
+      'list_sorting_airing_date': 'Airing Date',
+      'list_sorting_unread': 'Unread',
+      'list_sorting_latest_release': 'Latest Release',
+      'settings_progress_default': 'Default',
+      'settings_Mode': 'Sync Mode',
+      'Anime': 'Anime',
+      'Manga': 'Manga',
+      'overview_sidebar_Score': 'Score',
+      'overview_sidebar_Favorites': 'Favorites',
+      'overview_sidebar_Popularity': 'Popularity',
+      'overview_sidebar_Ranked': 'Ranked',
+      'overview_sidebar_Format': 'Format',
+      'overview_sidebar_Episodes': 'Episodes',
+      'overview_sidebar_Duration': 'Duration',
+      'overview_sidebar_Status': 'Status',
+      'overview_sidebar_Start_Date': 'Start Date',
+      'overview_sidebar_End_Date': 'End Date',
+      'overview_sidebar_Season': 'Season',
+      'overview_sidebar_Studios': 'Studios',
+      'overview_sidebar_Authors': 'Authors',
+      'overview_sidebar_Source': 'Source',
+      'overview_sidebar_Genres': 'Genres',
+      'overview_sidebar_external_links': 'External Links',
+      'overview_sidebar_Type': 'Type',
+      'overview_sidebar_Rating': 'Rating',
+      'overview_sidebar_Licensors': 'Licensors',
+      'overview_sidebar_Published': 'Published',
+      'overview_sidebar_Aired': 'Aired',
+      'search_Year': 'Year',
+      'bookmarksItem_now': 'Now',
+      'prediction_Episode_anime': 'Next episode {0}',
+      'prediction_Episode_manga': 'Next chapter {0}',
+      'prediction_Last_anime': 'Last episode {0}',
+      'prediction_Last_manga': 'Last chapter {0}',
+      'syncPage_flashConfirm_start_anime': 'Start watching?',
+      'syncPage_flashConfirm_start_manga': 'Start reading?',
+      'syncPage_flashConfirm_complete': 'Mark as completed?',
+      'syncPage_flashConfirm_rewatch_start_anime': 'Start rewatching?',
+      'syncPage_flashConfirm_rewatch_start_manga': 'Start rereading?',
+      'syncPage_flashConfirm_rewatch_finish_anime': 'Finish rewatching?',
+      'syncPage_flashConfirm_rewatch_finish_manga': 'Finish rereading?',
+      'Ok': 'OK',
+      'Cancel': 'Cancel',
+      'Yes': 'Yes',
+      'No': 'No',
+      'correction_DBRequest': 'Send correction to database?',
+      'correction_NewUrl': 'New URL: {0}',
+};
+
 function ensureDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
@@ -198,89 +306,19 @@ const storageObj = {
   },
 
   lang(selector: string, args?: string[]): string {
-    // Minimal i18n stub — return the key or a generic message
-    const langMap: Record<string, string> = {
-      'Error_Authenticate': 'Please authenticate with {0}',
-      'Error_Blocked': '{0} is blocked',
-      'UI_Status_watching_anime': 'Watching',
-      'UI_Status_watching_manga': 'Reading',
-      'UI_Status_Completed': 'Completed',
-      'UI_Status_OnHold': 'On Hold',
-      'UI_Status_Dropped': 'Dropped',
-      'UI_Status_planTo_anime': 'Plan to Watch',
-      'UI_Status_planTo_manga': 'Plan to Read',
-      'UI_Status_Rewatching_anime': 'Rewatching',
-      'UI_Status_Rewatching_manga': 'Rereading',
-      'UI_Status_Considering': 'Considering',
-      'UI_Status_All': 'All',
-      'UI_Episode': 'Episode',
-      'UI_Chapter': 'Chapter',
-      'UI_Score_Not_Rated': 'Not Rated',
-      'UI_Score_Masterpiece': 'Masterpiece',
-      'UI_Score_Great': 'Great',
-      'UI_Score_VeryGood': 'Very Good',
-      'UI_Score_Good': 'Good',
-      'UI_Score_Fine': 'Fine',
-      'UI_Score_Average': 'Average',
-      'UI_Score_Bad': 'Bad',
-      'UI_Score_VeryBad': 'Very Bad',
-      'UI_Score_Horrible': 'Horrible',
-      'UI_Score_Appalling': 'Appalling',
-      'list_sorting_alpha': 'Alphabetical',
-      'list_sorting_history': 'Last Updated',
-      'list_sorting_score': 'Score',
-      'list_sorting_airing_date': 'Airing Date',
-      'list_sorting_unread': 'Unread',
-      'list_sorting_latest_release': 'Latest Release',
-      'settings_progress_default': 'Default',
-      'settings_Mode': 'Sync Mode',
-      'Anime': 'Anime',
-      'Manga': 'Manga',
-      'overview_sidebar_Score': 'Score',
-      'overview_sidebar_Favorites': 'Favorites',
-      'overview_sidebar_Popularity': 'Popularity',
-      'overview_sidebar_Ranked': 'Ranked',
-      'overview_sidebar_Format': 'Format',
-      'overview_sidebar_Episodes': 'Episodes',
-      'overview_sidebar_Duration': 'Duration',
-      'overview_sidebar_Status': 'Status',
-      'overview_sidebar_Start_Date': 'Start Date',
-      'overview_sidebar_End_Date': 'End Date',
-      'overview_sidebar_Season': 'Season',
-      'overview_sidebar_Studios': 'Studios',
-      'overview_sidebar_Authors': 'Authors',
-      'overview_sidebar_Source': 'Source',
-      'overview_sidebar_Genres': 'Genres',
-      'overview_sidebar_external_links': 'External Links',
-      'overview_sidebar_Type': 'Type',
-      'overview_sidebar_Rating': 'Rating',
-      'overview_sidebar_Licensors': 'Licensors',
-      'overview_sidebar_Published': 'Published',
-      'overview_sidebar_Aired': 'Aired',
-      'search_Year': 'Year',
-      'bookmarksItem_now': 'Now',
-      'prediction_Episode_anime': 'Next episode {0}',
-      'prediction_Episode_manga': 'Next chapter {0}',
-      'prediction_Last_anime': 'Last episode {0}',
-      'prediction_Last_manga': 'Last chapter {0}',
-      'syncPage_flashConfirm_start_anime': 'Start watching?',
-      'syncPage_flashConfirm_start_manga': 'Start reading?',
-      'syncPage_flashConfirm_complete': 'Mark as completed?',
-      'syncPage_flashConfirm_rewatch_start_anime': 'Start rewatching?',
-      'syncPage_flashConfirm_rewatch_start_manga': 'Start rereading?',
-      'syncPage_flashConfirm_rewatch_finish_anime': 'Finish rewatching?',
-      'syncPage_flashConfirm_rewatch_finish_manga': 'Finish rereading?',
-      'Ok': 'OK',
-      'Cancel': 'Cancel',
-      'Yes': 'Yes',
-      'No': 'No',
-      'correction_DBRequest': 'Send correction to database?',
-      'correction_NewUrl': 'New URL: {0}',
-    };
-    let text = langMap[selector] || selector;
+    const entry = loadLocaleMessages()[selector];
+    let text = entry?.message ?? langMap[selector] ?? selector;
+    // Chrome's i18n replaces a named placeholder with its content first, and
+    // that content is usually the argument's own $1.
+    if (entry?.placeholders) {
+      for (const [name, placeholder] of Object.entries(entry.placeholders)) {
+        text = text.split(`$${name}$`).join(placeholder.content);
+      }
+    }
     if (args) {
       args.forEach((arg, i) => {
-        text = text.replace(`{${i}}`, arg);
+        text = text.split(`$${i + 1}`).join(arg);
+        text = text.split(`{${i}}`).join(arg);
       });
     }
     return text;
