@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:yuri_reader/modules/malsync/malsync_meta_sections.dart';
 import 'package:yuri_reader/modules/malsync/malsync_screen.dart';
 import 'package:yuri_reader/modules/malsync/malsync_style.dart';
 import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';
@@ -35,6 +38,10 @@ class _MalSyncEntryScreenState extends State<MalSyncEntryScreen> {
   late final TextEditingController _volumeController;
   bool _saving = false;
 
+  /// What the site itself says about this title. It arrives after the entry
+  /// data does, so the page is usable before it lands.
+  Map<String, dynamic>? _meta;
+
   String get _url => '${widget.entry['url'] ?? ''}';
   String get _title => '${widget.entry['title'] ?? ''}';
   int get _total => (widget.entry['total'] as num?)?.toInt() ?? 0;
@@ -50,6 +57,25 @@ class _MalSyncEntryScreenState extends State<MalSyncEntryScreen> {
     _score = (widget.entry['score'] as num?)?.toInt() ?? 0;
     _progressController = TextEditingController(text: '$_progress');
     _volumeController = TextEditingController(text: '$_volume');
+    unawaited(_loadMeta());
+  }
+
+  /// The site's own data for this title: description, statistics, other names,
+  /// cast, related and recommended titles, reviews, details. Failure is not an
+  /// error state of its own - the entry and its controls are the page, and
+  /// this is what the site adds to it.
+  Future<void> _loadMeta() async {
+    if (_url.isEmpty) return;
+    try {
+      final meta = await YuriSyncService().entryMeta(
+        url: _url,
+        type: _isManga ? 'manga' : 'anime',
+      );
+      if (!mounted) return;
+      setState(() => _meta = meta);
+    } catch (_) {
+      // The page keeps working without it.
+    }
   }
 
   @override
@@ -168,6 +194,12 @@ class _MalSyncEntryScreenState extends State<MalSyncEntryScreen> {
                           _cover(image, height: null),
                           const SizedBox(height: MalSyncStyle.sectionGap),
                           ...controls,
+                          // Their page puts the details under the cover, not
+                          // with the rest of the title's data.
+                          if (_meta != null) ...[
+                            const SizedBox(height: MalSyncStyle.sectionGap),
+                            MalSyncInfoSection(meta: _meta!),
+                          ],
                         ],
                       ),
                     ),
@@ -175,7 +207,11 @@ class _MalSyncEntryScreenState extends State<MalSyncEntryScreen> {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [_header(), const _Divider()],
+                        children: [
+                          _header(),
+                          const _Divider(),
+                          if (_meta != null) MalSyncMetaSections(meta: _meta!),
+                        ],
                       ),
                     ),
                   ],
@@ -193,7 +229,12 @@ class _MalSyncEntryScreenState extends State<MalSyncEntryScreen> {
                   children: [
                     _header(),
                     const _Divider(),
+                    if (_meta != null) MalSyncMetaSections(meta: _meta!),
                     ...controls,
+                    if (_meta != null) ...[
+                      const SizedBox(height: MalSyncStyle.sectionGap),
+                      MalSyncInfoSection(meta: _meta!),
+                    ],
                   ],
                 ),
               ),

@@ -25,6 +25,14 @@ abstract final class MalSyncStyle {
   /// Their secondary (red), unchanged between themes.
   static const secondary = Color(0xFFEB5757);
 
+  /// The colour their links use inside body text.
+  static Color secondaryText(BuildContext context) =>
+      _dark(context) ? const Color(0xFFFF7C7C) : const Color(0xFFDE0C0C);
+
+  /// The near-black their pills and badges sit on.
+  static Color darkBackground(BuildContext context) =>
+      _dark(context) ? const Color(0xFF3B3B3B) : const Color(0xFF313131);
+
   /// The page behind the cards.
   static Color background(BuildContext context) =>
       _dark(context) ? const Color(0xFF353535) : Colors.white;
