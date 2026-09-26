@@ -671,6 +671,7 @@ class _MangaChapterPageGalleryState
                   ),
                   onFailedToLoadImage: _onFailedToLoadImage,
                   onWidePage: _splitWidePage,
+                  onPageImageLoaded: _onContinuousPageImageLoaded,
                   onWideSinglePageLoaded: (index) {
                     Future.delayed(const Duration(milliseconds: 300), () {
                       if (!mounted) return;
@@ -1057,6 +1058,33 @@ class _MangaChapterPageGalleryState
 
   /// Handles scroll-based page changes in continuous mode (vertical or horizontal).
   ///
+  /// Upstream asks for this once a page's image has loaded, so the jump to the
+  /// page the reader was left on happens against pages that have been laid out
+  /// rather than an empty list. Only that jump uses it: this reader opens at a
+  /// remembered page, which is [_currentIndex], and the jump is made when that
+  /// page reports its image.
+  void _onContinuousPageImageLoaded(int index) {
+    if (!_initialContinuousJumpPending || !_cachedReaderMode.isContinuous) {
+      return;
+    }
+    final target = _currentIndex;
+    if (target == null || index != target) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_initialContinuousJumpPending) return;
+      final currentTarget = _currentIndex;
+      if (currentTarget == null ||
+          !_listController.isAttached ||
+          !_continuousScrollController.hasClients) {
+        return;
+      }
+      _listController.jumpToItem(
+        index: currentTarget,
+        scrollController: _continuousScrollController,
+        alignment: 0.0,
+      );
+    });
+  }
+
   /// Responsibilities:
   /// - Determine the first visible item from the scroll position listener.
   /// - Detect page changes and trigger flash animation.
