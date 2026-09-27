@@ -45,8 +45,9 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
 
   @override
   void dispose() {
+    _cookieTimer?.cancel();
     if (Platform.isLinux) {
-      _desktopWebview?.close();
+      _closeDesktopWebview();
     } else {
       _closeBrowser();
     }
@@ -69,6 +70,26 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
   }
 
   Webview? _desktopWebview;
+  Timer? _cookieTimer;
+  bool _webviewClosed = false;
+  bool _routePopped = false;
+
+  /// Closing the native Linux window also runs onClose and dispose. The plugin
+  /// cannot close the same WebView twice: its second close removes the GTK view
+  /// twice and crashes the app.
+  void _closeDesktopWebview() {
+    if (_webviewClosed) return;
+    _webviewClosed = true;
+    _desktopWebview?.close();
+  }
+
+  void _popWebviewRoute() {
+    if (_routePopped) return;
+    _routePopped = true;
+    _cookieTimer?.cancel();
+    if (mounted) Navigator.pop(context);
+  }
+
   Future<void> _runWebViewDesktop() async {
     String? ua = ref.watch(userAgentStateProvider);
     if (ua == defaultUserAgent) {
@@ -77,7 +98,7 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
     if (Platform.isLinux) {
       _desktopWebview = await WebviewWindow.create();
 
-      final timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      _cookieTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
         try {
           final cookieList = await _desktopWebview!.getAllCookies();
           final ua =
@@ -95,10 +116,8 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
         ..setBrightness(Brightness.dark)
         ..launch(widget.url)
         ..onClose.whenComplete(() {
-          timer.cancel();
-          if (mounted) {
-            Navigator.pop(context);
-          }
+          _webviewClosed = true;
+          _popWebviewRoute();
         });
     } else {
       browser = MyInAppBrowser(
@@ -165,9 +184,8 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
               ),
               leading: IconButton(
                 onPressed: () {
-                  if (_desktopWebview != null) _desktopWebview!.close();
-
-                  Navigator.pop(context);
+                  _closeDesktopWebview();
+                  _popWebviewRoute();
                 },
                 icon: const Icon(Icons.close),
               ),

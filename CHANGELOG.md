@@ -1,5 +1,12 @@
 # Yuri-Reader - Change Log
 
+## Version 0.6.3
+
+### [2026-09-27]
+
+#### Fixed
+- On Linux, closing the Webview from its top-left button could close and remove the native window twice: once on Back and again during teardown. That invalidated the Webview's GTK view and crashed the app. The Webview now closes and pops the route at most once, and stops its cookie timer on teardown
+
 ## Version 0.6.2
 
 ### [2026-09-27]
