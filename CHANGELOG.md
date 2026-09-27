@@ -1,5 +1,12 @@
 # Yuri-Reader - Change Log
 
+## Version 0.6.2
+
+### [2026-09-27]
+
+#### Fixed
+- The Linux release now ships the reader's native image decoder, and it can decode WebP chapter images such as Dynasty Scans serves. The WebP decoder is a temporary local addition while waiting for upstream; its source is marked `TODO: tmp fix, awaiting upstream fix`
+
 ## Version 0.6.1
 
 ### [2026-09-26]

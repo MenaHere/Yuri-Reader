@@ -54,6 +54,14 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
 
+# Optional image decoding libraries for the native Linux image decoder.
+# Install with: sudo apt install libjpeg-dev libpng-dev libavif-dev libwebp-dev (Debian/Ubuntu)
+#               sudo dnf install libjpeg-turbo-devel libpng-devel libavif-devel libwebp-devel (Fedora/RHEL)
+find_package(JPEG)
+find_package(PNG)
+pkg_check_modules(AVIF IMPORTED_TARGET libavif)
+pkg_check_modules(WEBP IMPORTED_TARGET libwebp)
+
 add_definitions(-DAPPLICATION_ID="${APPLICATION_ID}")
 
 # Define the application target. To change its name, change BINARY_NAME above,
@@ -119,6 +127,55 @@ install(FILES "${FLUTTER_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   COMPONENT Runtime)
 
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/bundle/lib/libmtorrentserver.so" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  COMPONENT Runtime)
+
+add_library(subsampling_scale_image_view SHARED
+  "${CMAKE_CURRENT_SOURCE_DIR}/../lib/ffi/image_decoder.cpp"
+)
+apply_standard_settings(subsampling_scale_image_view)
+target_include_directories(subsampling_scale_image_view PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../lib/ffi")
+
+# Link dl library for runtime dynamic loading (dlopen)
+target_link_libraries(subsampling_scale_image_view PRIVATE ${CMAKE_DL_LIBS})
+
+# Include headers for type definitions during compilation (symbols are resolved dynamically at runtime via dlopen)
+if(JPEG_FOUND)
+  target_include_directories(subsampling_scale_image_view PRIVATE ${JPEG_INCLUDE_DIRS})
+  target_compile_definitions(subsampling_scale_image_view PRIVATE HAVE_LIBJPEG)
+  message(STATUS "libjpeg headers found: JPEG dynamic decoding enabled for Linux")
+else()
+  message(WARNING "libjpeg headers not found. Install libjpeg-dev (Ubuntu) or libjpeg-turbo-devel (Fedora).")
+endif()
+
+# Link libpng headers if found
+if(PNG_FOUND)
+  target_include_directories(subsampling_scale_image_view PRIVATE ${PNG_INCLUDE_DIRS})
+  target_compile_definitions(subsampling_scale_image_view PRIVATE HAVE_LIBPNG)
+  message(STATUS "libpng headers found: PNG dynamic decoding enabled for Linux")
+else()
+  message(WARNING "libpng headers not found. Install libpng-dev (Ubuntu) or libpng-devel (Fedora).")
+endif()
+
+# Link libavif headers if found
+if(AVIF_FOUND)
+  target_include_directories(subsampling_scale_image_view PRIVATE ${AVIF_INCLUDE_DIRS})
+  target_compile_definitions(subsampling_scale_image_view PRIVATE HAVE_LIBAVIF)
+  message(STATUS "libavif headers found: AVIF dynamic decoding enabled for Linux")
+else()
+  message(WARNING "libavif headers not found. Install libavif-dev (Ubuntu) or libavif-devel (Fedora).")
+endif()
+
+# Link libwebp headers if found
+if(WEBP_FOUND)
+  target_include_directories(subsampling_scale_image_view PRIVATE ${WEBP_INCLUDE_DIRS})
+  target_compile_definitions(subsampling_scale_image_view PRIVATE HAVE_LIBWEBP)
+  message(STATUS "libwebp headers found: WebP decoding enabled for Linux")
+else()
+  message(WARNING "libwebp headers not found. Install libwebp-dev (Ubuntu) or libwebp-devel (Fedora).")
+endif()
+
+install(TARGETS subsampling_scale_image_view
+  LIBRARY DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   COMPONENT Runtime)
 
 # Install the Yuri-Sync binary next to the executable
