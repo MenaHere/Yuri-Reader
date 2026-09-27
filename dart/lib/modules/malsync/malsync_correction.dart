@@ -10,6 +10,29 @@ import 'package:yuri_reader/modules/tracker_library/tracker_library_screen.dart'
 import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';
 import 'package:yuri_reader/utils/cached_network.dart';
 
+/// malsync's own title cleaner, used before a search.
+///
+/// A site marks its name with the audio or subtitle tags it carries, and with a
+/// "novel" or a Blu-ray one, while the service lists the title without them. So
+/// the search starts from the cleaned name rather than the page's, which is
+/// what its own correction search does.
+String malSyncSanitizedTitle(String title) {
+  var result = title.replaceFirst(
+    RegExp(
+      r' *(\(dub\)|\(sub\)|\(uncensored\)|\(uncut\)|\(subbed\)|\(dubbed\)|\(novel\)|\(wn\)|\(ln\))',
+      caseSensitive: false,
+    ),
+    '',
+  );
+  result = result.replaceFirst(
+    RegExp(r' *\([^)]+audio\)', caseSensitive: false),
+    '',
+  );
+  result = result.replaceFirst(RegExp(r' BD( |$)', caseSensitive: false), '');
+  result = result.trim();
+  return result.length > 99 ? result.substring(0, 99) : result;
+}
+
 /// The malsync track row for a title, when it has one.
 ///
 /// The bridge matches a title by searching for it every time; this row is where
@@ -92,6 +115,7 @@ class _MalSyncCorrectionState extends State<_MalSyncCorrection> {
   final TextEditingController _query = TextEditingController();
   Map<String, dynamic>? _current;
   List<Map<String, dynamic>> _results = const [];
+  Timer? _debounce;
   bool _loading = true;
   bool _searching = false;
   String? _error;
@@ -101,13 +125,31 @@ class _MalSyncCorrectionState extends State<_MalSyncCorrection> {
   @override
   void initState() {
     super.initState();
+    // The box opens with the title already in it and the search already
+    // running, which is how malsync's own correction search opens: the right
+    // entry is then one tap away instead of a typed query away.
+    _query.text = malSyncSanitizedTitle(_title);
     unawaited(_loadCurrent());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_search());
+    });
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _query.dispose();
     super.dispose();
+  }
+
+  /// Re-searching as the text changes, after the short pause malsync's own
+  /// search waits for: a request per keystroke is wasteful and its search does
+  /// not do it either.
+  void _onQueryChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 200), () {
+      if (mounted) unawaited(_search());
+    });
   }
 
   /// The match in force, which is the hand-picked one when there is one.
@@ -217,6 +259,7 @@ class _MalSyncCorrectionState extends State<_MalSyncCorrection> {
                 Expanded(
                   child: TextField(
                     controller: _query,
+                    onChanged: _onQueryChanged,
                     onSubmitted: (_) => _search(),
                     style: TextStyle(
                       color: MalSyncStyle.text(context),
@@ -282,6 +325,7 @@ class _MalSyncCorrectionState extends State<_MalSyncCorrection> {
                   itemCount: _results.length,
                   itemBuilder: (context, index) {
                     final result = _results[index];
+                    final isCurrent = _isCurrent(result);
                     return ListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
@@ -297,12 +341,30 @@ class _MalSyncCorrectionState extends State<_MalSyncCorrection> {
                           ),
                         ),
                       ),
-                      title: Text(
-                        '${result['name'] ?? ''}',
-                        style: TextStyle(
-                          color: MalSyncStyle.text(context),
-                          fontSize: MalSyncStyle.smallText,
-                        ),
+                      title: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '${result['name'] ?? ''}',
+                              style: TextStyle(
+                                color: isCurrent
+                                    ? MalSyncStyle.primary
+                                    : MalSyncStyle.text(context),
+                                fontSize: MalSyncStyle.smallText,
+                              ),
+                            ),
+                          ),
+                          if (isCurrent) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              'current',
+                              style: TextStyle(
+                                color: MalSyncStyle.primary,
+                                fontSize: MalSyncStyle.tinyText,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       subtitle: Text(
                         [
@@ -323,6 +385,13 @@ class _MalSyncCorrectionState extends State<_MalSyncCorrection> {
         ),
       ),
     );
+  }
+
+  /// The row that is the match in force, so what this title is on now - and
+  /// what picking another row would change - is visible at a glance.
+  bool _isCurrent(Map<String, dynamic> result) {
+    final currentUrl = '${_current?['url'] ?? ''}';
+    return currentUrl.isNotEmpty && currentUrl == '${result['url'] ?? ''}';
   }
 
   Widget _currentMatch(BuildContext context) {

@@ -1,5 +1,12 @@
 # Yuri-Reader - Change Log
 
+## Version 0.6.1
+
+### [2026-09-26]
+
+#### Changed
+- The correction search opens with the title already in its box and the search already running, which is how MAL-Sync's own correction search opens: the right entry is one tap away instead of a typed query away. The title is cleaned the way its own search cleans it first - the audio, subtitle, novel and Blu-ray marks a site adds to a name are dropped, because the service lists the title without them. Typing re-searches after the same short pause its own search waits for, and the row this title is on now is marked so it is clear what picking another would change
+
 ## Version 0.6.0
 
 ### [2026-09-26]
