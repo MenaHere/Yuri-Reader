@@ -1,5 +1,12 @@
 # Yuri-Reader - Change Log
 
+## Version 0.6.4
+
+### [2026-09-27]
+
+#### Changed
+- Synchronize and Remove now live on the MAL-Sync entry update screen, where MAL-Sync's original `overview-update-ui` puts them, not in the inline panel on the manga chapter-list page. Add remains on the entry screen when it is off-list; the inline panel keeps its Add action for an off-list match
+
 ## Version 0.6.3
 
 ### [2026-09-27]

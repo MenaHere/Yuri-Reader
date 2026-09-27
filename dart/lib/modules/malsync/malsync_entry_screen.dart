@@ -34,6 +34,7 @@ class _MalSyncEntryScreenState extends State<MalSyncEntryScreen> {
   late int _volume;
   late int _status;
   late int _score;
+  bool _onList = true;
   late final TextEditingController _progressController;
   late final TextEditingController _volumeController;
   bool _saving = false;
@@ -140,6 +141,125 @@ class _MalSyncEntryScreenState extends State<MalSyncEntryScreen> {
     }
   }
 
+  /// The provider values shown by MAL-Sync's Synchronize action, which pulls
+  /// them without changing them.
+  Future<void> _synchronize() async {
+    if (_url.isEmpty || _saving) return;
+    setState(() => _saving = true);
+    try {
+      final entry = await YuriSyncService().entryGet(
+        url: _url,
+        type: _isManga ? 'manga' : 'anime',
+      );
+      if (mounted) setState(() => _applyEntry(entry));
+    } catch (e) {
+      if (!mounted) return;
+      _showActionError(e);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Removes the provider entry, leaving this page's URL available for Add.
+  Future<void> _remove() async {
+    if (_url.isEmpty || _saving) return;
+    setState(() => _saving = true);
+    try {
+      await YuriSyncService().entryDelete(
+        url: _url,
+        type: _isManga ? 'manga' : 'anime',
+      );
+      if (mounted) setState(() => _onList = false);
+    } catch (e) {
+      if (!mounted) return;
+      _showActionError(e);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Adds this exact entry, with MAL-Sync's default manga state: Plan to Read.
+  Future<void> _add() async {
+    if (_url.isEmpty || _saving) return;
+    setState(() => _saving = true);
+    try {
+      final entry = await YuriSyncService().entryAdd(
+        url: _url,
+        type: _isManga ? 'manga' : 'anime',
+        status: 6,
+      );
+      if (mounted) setState(() => _applyEntry(entry));
+    } catch (e) {
+      if (!mounted) return;
+      _showActionError(e);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _applyEntry(Map<String, dynamic> entry) {
+    _onList = entry['onList'] == true;
+    _progress = (entry['episode'] as num?)?.toInt() ?? _progress;
+    _volume = (entry['volume'] as num?)?.toInt() ?? _volume;
+    _status = (entry['status'] as num?)?.toInt() ?? _status;
+    _score = (entry['score'] as num?)?.toInt() ?? _score;
+    _progressController.text = '$_progress';
+    _volumeController.text = '$_volume';
+  }
+
+  void _showActionError(Object error) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Could not save: ${error.toString().replaceFirst(RegExp(r'^Exception: '), '')}',
+        ),
+      ),
+    );
+  }
+
+  /// The original entry overview shows these actions after the controls. This
+  /// is not part of the inline MalSyncPanel beside the chapter list.
+  Widget _listActions() {
+    if (_onList) {
+      return Wrap(
+        alignment: WrapAlignment.start,
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          TextButton.icon(
+            onPressed: _saving ? null : _synchronize,
+            icon: const Icon(Icons.cloud_download, size: 18),
+            label: const Text('Synchronize'),
+            style: TextButton.styleFrom(
+              minimumSize: Size.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          TextButton.icon(
+            onPressed: _saving ? null : _remove,
+            icon: const Icon(Icons.remove_circle_outline, size: 18),
+            label: const Text('Remove'),
+            style: TextButton.styleFrom(
+              foregroundColor: MalSyncStyle.secondaryText(context),
+              minimumSize: Size.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ],
+      );
+    }
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: _saving ? null : _add,
+        icon: const Icon(Icons.bookmark_add, size: 18),
+        label: const Text('Add'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -165,8 +285,7 @@ class _MalSyncEntryScreenState extends State<MalSyncEntryScreen> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final wide =
-              constraints.maxWidth >= MalSyncStyle.overviewBreakpoint;
+          final wide = constraints.maxWidth >= MalSyncStyle.overviewBreakpoint;
           final image = '${widget.entry['image'] ?? ''}';
           final controls = <Widget>[
             _progressSection(),
@@ -194,6 +313,7 @@ class _MalSyncEntryScreenState extends State<MalSyncEntryScreen> {
                           _cover(image, height: null),
                           const SizedBox(height: MalSyncStyle.sectionGap),
                           ...controls,
+                          _listActions(),
                           // Their page puts the details under the cover, not
                           // with the rest of the title's data.
                           if (_meta != null) ...[
@@ -231,6 +351,7 @@ class _MalSyncEntryScreenState extends State<MalSyncEntryScreen> {
                     const _Divider(),
                     if (_meta != null) MalSyncMetaSections(meta: _meta!),
                     ...controls,
+                    _listActions(),
                     if (_meta != null) ...[
                       const SizedBox(height: MalSyncStyle.sectionGap),
                       MalSyncInfoSection(meta: _meta!),
@@ -423,7 +544,10 @@ class _MalSyncEntryScreenState extends State<MalSyncEntryScreen> {
     required ValueChanged<int> onSubmitted,
   }) {
     return Container(
-      decoration: MalSyncStyle.control(context, radius: MalSyncStyle.miniRadius),
+      decoration: MalSyncStyle.control(
+        context,
+        radius: MalSyncStyle.miniRadius,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -501,9 +625,7 @@ class _Section extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.only(
-                bottom: MalSyncStyle.labelRowGap,
-              ),
+              padding: const EdgeInsets.only(bottom: MalSyncStyle.labelRowGap),
               child: Row(
                 children: [
                   Text(
@@ -524,10 +646,7 @@ class _Section extends StatelessWidget {
                       ),
                     ),
                   ],
-                  if (trailing != null) ...[
-                    const Spacer(),
-                    trailing!,
-                  ],
+                  if (trailing != null) ...[const Spacer(), trailing!],
                 ],
               ),
             ),
@@ -538,9 +657,7 @@ class _Section extends StatelessWidget {
                   activeTrackColor: MalSyncStyle.primary,
                   inactiveTrackColor: MalSyncStyle.backdrop(context),
                   thumbColor: MalSyncStyle.foreground(context),
-                  overlayShape: const RoundSliderOverlayShape(
-                    overlayRadius: 0,
-                  ),
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 0),
                   thumbShape: const RoundSliderThumbShape(
                     enabledThumbRadius: 9,
                   ),
@@ -549,9 +666,12 @@ class _Section extends StatelessWidget {
                   value: value!.clamp(0, sliderMax.toInt()).toDouble(),
                   max: sliderMax,
                   divisions: sliderMax.toInt(),
-                  onChanged: (max ?? 0) > 0 ? (v) => onSlide?.call(v.round()) : null,
-                  onChangeEnd:
-                      (max ?? 0) > 0 ? (v) => onSlideEnd?.call(v.round()) : null,
+                  onChanged: (max ?? 0) > 0
+                      ? (v) => onSlide?.call(v.round())
+                      : null,
+                  onChangeEnd: (max ?? 0) > 0
+                      ? (v) => onSlideEnd?.call(v.round())
+                      : null,
                 ),
               ),
           ],

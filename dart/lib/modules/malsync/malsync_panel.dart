@@ -201,37 +201,6 @@ class _MalSyncPanelState extends State<MalSyncPanel> {
     }
   }
 
-  Future<void> _synchronize() async {
-    if (_url.isEmpty || _saving) return;
-    setState(() => _saving = true);
-    try {
-      final entry = await YuriSyncService().entryGet(
-        url: _url,
-        type: widget.type,
-      );
-      if (mounted) setState(() => _applyEntry(entry));
-    } catch (e) {
-      if (!mounted) return;
-      _showActionError(e);
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  Future<void> _remove() async {
-    if (_url.isEmpty || _saving) return;
-    setState(() => _saving = true);
-    try {
-      await YuriSyncService().entryDelete(url: _url, type: widget.type);
-      if (mounted) setState(() => _onList = false);
-    } catch (e) {
-      if (!mounted) return;
-      _showActionError(e);
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
   void _showActionError(Object error) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -306,91 +275,57 @@ class _MalSyncPanelState extends State<MalSyncPanel> {
         ),
       );
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Wrap(
+      alignment: WrapAlignment.start,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 16,
+      runSpacing: 8,
       children: [
-        Wrap(
-          alignment: WrapAlignment.start,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 16,
-          runSpacing: 8,
-          children: [
-            _item(
-              context,
-              'Score',
-              _rating.isEmpty || _rating == 'N/A'
-                  ? Text('N/A', style: labelStyle)
-                  : InkWell(
-                      onTap: _openSite,
-                      child: Text(
-                        _rating,
-                        style: TextStyle(
-                          color: MalSyncStyle.secondaryText(context),
-                          fontSize: MalSyncStyle.smallText,
-                        ),
-                      ),
+        _item(
+          context,
+          'Score',
+          _rating.isEmpty || _rating == 'N/A'
+              ? Text('N/A', style: labelStyle)
+              : InkWell(
+                  onTap: _openSite,
+                  child: Text(
+                    _rating,
+                    style: TextStyle(
+                      color: MalSyncStyle.secondaryText(context),
+                      fontSize: MalSyncStyle.smallText,
                     ),
-            ),
-            _item(
-              context,
-              'Status',
-              MalSyncStateDropdown(
-                state: _status,
-                isManga: _isManga,
-                onChanged: (state) => _save(status: state),
-              ),
-            ),
-            if (_isManga)
-              _item(
-                context,
-                'Volume',
-                _countField(
-                  controller: _volumeController,
-                  total: _totalVolume,
-                  onSubmitted: (value) => _save(volume: value),
+                  ),
                 ),
-              ),
-            _item(
-              context,
-              _isManga ? 'Chapter' : 'Episode',
-              _countField(
-                controller: _progressController,
-                total: _total,
-                onSubmitted: (value) => _save(progress: value),
-              ),
-            ),
-            _item(context, 'Your Score', _scoreField(context)),
-          ],
         ),
-        const SizedBox(height: 4),
-        Wrap(
-          alignment: WrapAlignment.start,
-          spacing: 8,
-          runSpacing: 4,
-          children: [
-            TextButton.icon(
-              onPressed: _saving ? null : _synchronize,
-              icon: const Icon(Icons.cloud_download, size: 18),
-              label: const Text('Synchronize'),
-              style: TextButton.styleFrom(
-                minimumSize: Size.zero,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-            TextButton.icon(
-              onPressed: _saving ? null : _remove,
-              icon: const Icon(Icons.remove_circle_outline, size: 18),
-              label: const Text('Remove'),
-              style: TextButton.styleFrom(
-                foregroundColor: MalSyncStyle.secondaryText(context),
-                minimumSize: Size.zero,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-          ],
+        _item(
+          context,
+          'Status',
+          MalSyncStateDropdown(
+            state: _status,
+            isManga: _isManga,
+            onChanged: (state) => _save(status: state),
+          ),
         ),
+        if (_isManga)
+          _item(
+            context,
+            'Volume',
+            _countField(
+              controller: _volumeController,
+              total: _totalVolume,
+              onSubmitted: (value) => _save(volume: value),
+            ),
+          ),
+        _item(
+          context,
+          _isManga ? 'Chapter' : 'Episode',
+          _countField(
+            controller: _progressController,
+            total: _total,
+            onSubmitted: (value) => _save(progress: value),
+          ),
+        ),
+        _item(context, 'Your Score', _scoreField(context)),
       ],
     );
   }
