@@ -7,6 +7,9 @@
 #### Fixed
 - On Linux, closing the Webview from its top-left button could close and remove the native window twice: once on Back and again during teardown. That invalidated the Webview's GTK view and crashed the app. The Webview now closes and pops the route at most once, and stops its cookie timer on teardown
 
+#### Changed
+- The MAL-Sync manga panel now shows Synchronize and Remove for an entry on the list, and Add instead when it is not. Synchronize pulls the current provider values; Remove deletes the provider entry; Add uses MAL-Sync's manga default, Plan to Read. The locally chosen match is kept after Remove, so Add targets the same entry
+
 ## Version 0.6.2
 
 ### [2026-09-27]

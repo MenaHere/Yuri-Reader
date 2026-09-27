@@ -60,7 +60,10 @@ class YuriSyncService {
   }
 
   /// Internal JSON-RPC call. Auto-starts the service if needed.
-  Future<Map<String, dynamic>> _call(String method, Map<String, dynamic> params) async {
+  Future<Map<String, dynamic>> _call(
+    String method,
+    Map<String, dynamic> params,
+  ) async {
     await ensureInitialized();
     return _client!.call(method, params);
   }
@@ -71,7 +74,11 @@ class YuriSyncService {
 
   /// Forward an OAuth token to the sync service so MALSync providers
   /// can authenticate.
-  Future<void> setAuthToken(String provider, String token, {String? refreshToken}) async {
+  Future<void> setAuthToken(
+    String provider,
+    String token, {
+    String? refreshToken,
+  }) async {
     await _call('auth.exchange', {
       'provider': provider,
       'token': token,
@@ -131,6 +138,65 @@ class YuriSyncService {
     final response = await _call('entry.update', params);
     if (response['error'] != null) {
       throw Exception('entry.update failed: ${response['error']['message']}');
+    }
+    return response['result'] as Map<String, dynamic>;
+  }
+
+  /// Pulls the provider's current values for one entry without writing them.
+  /// This is MAL-Sync's `Synchronize` action when the app's controls have
+  /// already saved their changes as they were made.
+  Future<Map<String, dynamic>> entryGet({
+    required String url,
+    required String type,
+    String? provider,
+  }) async {
+    final response = await _call('entry.get', {
+      'url': url,
+      'type': type,
+      'provider': provider,
+    });
+    if (response['error'] != null) {
+      throw Exception('entry.get failed: ${response['error']['message']}');
+    }
+    return response['result'] as Map<String, dynamic>;
+  }
+
+  /// Adds one entry to the provider's list. [status] uses MAL-Sync's state
+  /// numbers: for manga, 6 is Plan to Read, the original panel's Add default.
+  Future<Map<String, dynamic>> entryAdd({
+    required String url,
+    required String type,
+    int? status,
+    int? progress,
+    String? provider,
+  }) async {
+    final response = await _call('entry.add', {
+      'url': url,
+      'type': type,
+      'status': status,
+      'progress': progress,
+      'provider': provider,
+    });
+    if (response['error'] != null) {
+      throw Exception('entry.add failed: ${response['error']['message']}');
+    }
+    return response['result'] as Map<String, dynamic>;
+  }
+
+  /// Removes one entry from the provider's list, matching MAL-Sync's Remove
+  /// action. The app's locally chosen match remains available for Add again.
+  Future<Map<String, dynamic>> entryDelete({
+    required String url,
+    required String type,
+    String? provider,
+  }) async {
+    final response = await _call('entry.delete', {
+      'url': url,
+      'type': type,
+      'provider': provider,
+    });
+    if (response['error'] != null) {
+      throw Exception('entry.delete failed: ${response['error']['message']}');
     }
     return response['result'] as Map<String, dynamic>;
   }

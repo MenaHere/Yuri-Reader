@@ -44,8 +44,6 @@ class _MalSyncPanelState extends State<MalSyncPanel> {
   String? _error;
   String _url = '';
   String _displayUrl = '';
-  String _shortName = '';
-  String _serviceName = '';
   String _rating = '';
   int _progress = 0;
   int _volume = 0;
@@ -99,22 +97,8 @@ class _MalSyncPanelState extends State<MalSyncPanel> {
         _loading = false;
         _found = result['found'] == true;
         if (!_found || entry is! Map) return;
-        _onList = entry['onList'] == true;
-        _url = '${entry['url'] ?? ''}';
-        _displayUrl = '${entry['displayUrl'] ?? _url}';
-        _shortName = '${entry['shortName'] ?? ''}';
-        _serviceName = MalSyncStyle.serviceName(
-          '${result['provider'] ?? _shortName}',
-        );
+        _applyEntry(entry.cast<String, dynamic>());
         _rating = '${result['rating'] ?? ''}';
-        _progress = (entry['episode'] as num?)?.toInt() ?? 0;
-        _volume = (entry['volume'] as num?)?.toInt() ?? 0;
-        _total = (entry['totalEpisodes'] as num?)?.toInt() ?? 0;
-        _totalVolume = (entry['totalVolumes'] as num?)?.toInt() ?? 0;
-        _status = (entry['status'] as num?)?.toInt() ?? 0;
-        _score = (entry['score'] as num?)?.toInt() ?? 0;
-        _progressController.text = '$_progress';
-        _volumeController.text = '$_volume';
       });
     } catch (e) {
       if (!mounted) return;
@@ -123,6 +107,21 @@ class _MalSyncPanelState extends State<MalSyncPanel> {
         _error = e.toString().replaceFirst(RegExp(r'^Exception: '), '');
       });
     }
+  }
+
+  /// Copies a provider response into the fields this panel displays.
+  void _applyEntry(Map<String, dynamic> entry) {
+    _onList = entry['onList'] == true;
+    _url = '${entry['url'] ?? _url}';
+    _displayUrl = '${entry['displayUrl'] ?? _displayUrl}';
+    _progress = (entry['episode'] as num?)?.toInt() ?? _progress;
+    _volume = (entry['volume'] as num?)?.toInt() ?? _volume;
+    _total = (entry['totalEpisodes'] as num?)?.toInt() ?? _total;
+    _totalVolume = (entry['totalVolumes'] as num?)?.toInt() ?? _totalVolume;
+    _status = (entry['status'] as num?)?.toInt() ?? _status;
+    _score = (entry['score'] as num?)?.toInt() ?? _score;
+    _progressController.text = '$_progress';
+    _volumeController.text = '$_volume';
   }
 
   /// Writes what changed. Setting a status on an entry that is not on the list
@@ -184,9 +183,63 @@ class _MalSyncPanelState extends State<MalSyncPanel> {
   }
 
   Future<void> _add() async {
-    if (await _save(status: 1)) {
-      await _load();
+    if (_url.isEmpty || _saving) return;
+    setState(() => _saving = true);
+    try {
+      // MAL-Sync's Add defaults manga to Plan to Read (state 6).
+      final entry = await YuriSyncService().entryAdd(
+        url: _url,
+        type: widget.type,
+        status: 6,
+      );
+      if (mounted) setState(() => _applyEntry(entry));
+    } catch (e) {
+      if (!mounted) return;
+      _showActionError(e);
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _synchronize() async {
+    if (_url.isEmpty || _saving) return;
+    setState(() => _saving = true);
+    try {
+      final entry = await YuriSyncService().entryGet(
+        url: _url,
+        type: widget.type,
+      );
+      if (mounted) setState(() => _applyEntry(entry));
+    } catch (e) {
+      if (!mounted) return;
+      _showActionError(e);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _remove() async {
+    if (_url.isEmpty || _saving) return;
+    setState(() => _saving = true);
+    try {
+      await YuriSyncService().entryDelete(url: _url, type: widget.type);
+      if (mounted) setState(() => _onList = false);
+    } catch (e) {
+      if (!mounted) return;
+      _showActionError(e);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _showActionError(Object error) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Could not save: ${error.toString().replaceFirst(RegExp(r'^Exception: '), '')}',
+        ),
+      ),
+    );
   }
 
   Future<void> _openSite() async {
@@ -217,7 +270,9 @@ class _MalSyncPanelState extends State<MalSyncPanel> {
           Flexible(
             child: Text(
               _error!,
-              style: labelStyle.copyWith(color: MalSyncStyle.secondaryText(context)),
+              style: labelStyle.copyWith(
+                color: MalSyncStyle.secondaryText(context),
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -237,76 +292,105 @@ class _MalSyncPanelState extends State<MalSyncPanel> {
       return Text('Nothing found for this title', style: labelStyle);
     }
     if (!_onList) {
-      final service = _serviceName.isNotEmpty
-          ? _serviceName
-          : (_shortName.isNotEmpty ? _shortName : 'the service');
-      return Row(
-        children: [
-          Text('Not on the list', style: labelStyle),
-          const SizedBox(width: 8),
-          TextButton(
-            onPressed: _saving ? null : _add,
-            style: TextButton.styleFrom(
-              minimumSize: Size.zero,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text('Add to $service'),
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: _saving ? null : _add,
+          icon: const Icon(Icons.bookmark_add, size: 18),
+          label: const Text('Add'),
+          style: TextButton.styleFrom(
+            minimumSize: Size.zero,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-        ],
+        ),
       );
     }
-    return Wrap(
-      alignment: WrapAlignment.start,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 16,
-      runSpacing: 8,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _item(
-          context,
-          'Score',
-          _rating.isEmpty || _rating == 'N/A'
-              ? Text('N/A', style: labelStyle)
-              : InkWell(
-                  onTap: _openSite,
-                  child: Text(
-                    _rating,
-                    style: TextStyle(
-                      color: MalSyncStyle.secondaryText(context),
-                      fontSize: MalSyncStyle.smallText,
+        Wrap(
+          alignment: WrapAlignment.start,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 16,
+          runSpacing: 8,
+          children: [
+            _item(
+              context,
+              'Score',
+              _rating.isEmpty || _rating == 'N/A'
+                  ? Text('N/A', style: labelStyle)
+                  : InkWell(
+                      onTap: _openSite,
+                      child: Text(
+                        _rating,
+                        style: TextStyle(
+                          color: MalSyncStyle.secondaryText(context),
+                          fontSize: MalSyncStyle.smallText,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-        ),
-        _item(
-          context,
-          'Status',
-          MalSyncStateDropdown(
-            state: _status,
-            isManga: _isManga,
-            onChanged: (state) => _save(status: state),
-          ),
-        ),
-        if (_isManga)
-          _item(
-            context,
-            'Volume',
-            _countField(
-              controller: _volumeController,
-              total: _totalVolume,
-              onSubmitted: (value) => _save(volume: value),
             ),
-          ),
-        _item(
-          context,
-          _isManga ? 'Chapter' : 'Episode',
-          _countField(
-            controller: _progressController,
-            total: _total,
-            onSubmitted: (value) => _save(progress: value),
-          ),
+            _item(
+              context,
+              'Status',
+              MalSyncStateDropdown(
+                state: _status,
+                isManga: _isManga,
+                onChanged: (state) => _save(status: state),
+              ),
+            ),
+            if (_isManga)
+              _item(
+                context,
+                'Volume',
+                _countField(
+                  controller: _volumeController,
+                  total: _totalVolume,
+                  onSubmitted: (value) => _save(volume: value),
+                ),
+              ),
+            _item(
+              context,
+              _isManga ? 'Chapter' : 'Episode',
+              _countField(
+                controller: _progressController,
+                total: _total,
+                onSubmitted: (value) => _save(progress: value),
+              ),
+            ),
+            _item(context, 'Your Score', _scoreField(context)),
+          ],
         ),
-        _item(context, 'Your Score', _scoreField(context)),
+        const SizedBox(height: 4),
+        Wrap(
+          alignment: WrapAlignment.start,
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            TextButton.icon(
+              onPressed: _saving ? null : _synchronize,
+              icon: const Icon(Icons.cloud_download, size: 18),
+              label: const Text('Synchronize'),
+              style: TextButton.styleFrom(
+                minimumSize: Size.zero,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _saving ? null : _remove,
+              icon: const Icon(Icons.remove_circle_outline, size: 18),
+              label: const Text('Remove'),
+              style: TextButton.styleFrom(
+                foregroundColor: MalSyncStyle.secondaryText(context),
+                minimumSize: Size.zero,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -338,7 +422,10 @@ class _MalSyncPanelState extends State<MalSyncPanel> {
     required ValueChanged<int> onSubmitted,
   }) {
     return Container(
-      decoration: MalSyncStyle.control(context, radius: MalSyncStyle.miniRadius),
+      decoration: MalSyncStyle.control(
+        context,
+        radius: MalSyncStyle.miniRadius,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       child: Row(
         mainAxisSize: MainAxisSize.min,
