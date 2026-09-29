@@ -12,6 +12,7 @@ import 'package:yuri_reader/models/track.dart';
 import 'package:yuri_reader/models/track_preference.dart';
 import 'package:yuri_reader/modules/manga/detail/providers/track_state_providers.dart';
 import 'package:yuri_reader/modules/manga/reader/providers/push_router.dart';
+import 'package:yuri_reader/modules/malsync/malsync_panel.dart';
 import 'package:yuri_reader/utils/extensions/manga_extensions.dart';
 import 'package:yuri_reader/modules/more/settings/track/providers/track_providers.dart';
 import 'package:yuri_reader/modules/tracker_library/tracker_library_screen.dart';
@@ -106,12 +107,31 @@ extension ChapterExtension on Chapter {
     final updateProgressAfterReading = ref.read(
       updateProgressAfterReadingStateProvider,
     );
+    final manga = this.manga.value;
+    if (kDebugMode) {
+      debugPrint(
+        '[TrackUpdate] ${DateTime.now().toIso8601String()} '
+        'enter chapter="$name" manga="${manga?.name}" '
+        'updateProgressAfterReading=$updateProgressAfterReading',
+      );
+    }
     if (!updateProgressAfterReading) return;
-    final manga = this.manga.value!;
+    if (manga == null) {
+      if (kDebugMode) {
+        debugPrint('[TrackUpdate] manga is null, aborting');
+      }
+      return;
+    }
     final chapterNumber = ChapterRecognition().parseEpisodeNumber(
       manga.name!,
       name!,
     );
+    if (kDebugMode) {
+      debugPrint(
+        '[TrackUpdate] parsed chapterNumber=$chapterNumber '
+        'itemType=${manga.itemType}',
+      );
+    }
 
     final tracks = isar.tracks
         .filter()
@@ -119,6 +139,18 @@ extension ChapterExtension on Chapter {
         .itemTypeEqualTo(manga.itemType)
         .mangaIdEqualTo(manga.id!)
         .findAllSync();
+    if (kDebugMode) {
+      debugPrint(
+        '[TrackUpdate] tracks found=${tracks.length} mangaId=${manga.id}',
+      );
+      for (final t in tracks) {
+        debugPrint(
+          '[TrackUpdate]   track syncId=${t.syncId} '
+          'lastChapterRead=${t.lastChapterRead} '
+          'totalChapter=${t.totalChapter} status=${t.status}',
+        );
+      }
+    }
 
     // MAL-Sync and the native trackers write the same accounts, and they read
     // the chapter number differently (the bridge searches by title, the native
@@ -131,6 +163,23 @@ extension ChapterExtension on Chapter {
         .syncIdIsNotNull()
         .syncIdEqualTo(TrackerProviders.malsync.syncId)
         .findFirstSync() != null;
+    if (kDebugMode) {
+      debugPrint('[TrackUpdate] malsyncOwnsTracking=$malsyncOwnsTracking');
+    }
+
+    // The match the user picked by hand is stored on the MAL-Sync track row.
+    // The bridge has to write to that entry: a fresh title search can land on
+    // a different entry, and then the user's own entry never moves.
+    final matchUrl = tracks
+        .where((track) => track.syncId == TrackerProviders.malsync.syncId)
+        .map((track) => track.trackingUrl)
+        .firstWhere(
+          (url) => url != null && url.isNotEmpty,
+          orElse: () => null,
+        );
+    if (kDebugMode) {
+      debugPrint('[TrackUpdate] matchUrl=$matchUrl');
+    }
 
     // Always attempt to sync via the Yuri-Sync MALSync bridge (fire-and-forget).
     if (kDebugMode) {
@@ -142,17 +191,45 @@ extension ChapterExtension on Chapter {
       );
     }
     unawaited(
-      _syncViaYuriSync(manga.name!, chapterNumber, manga.itemType),
+      _syncViaYuriSync(
+        manga.name!,
+        chapterNumber,
+        manga.itemType,
+        url: matchUrl,
+      ).whenComplete(() {
+        // Re-read the panel so the bumped value shows without the user leaving
+        // the page and opening it again.
+        malsyncSyncTick.value++;
+      }),
     );
 
-    if (tracks.isEmpty || malsyncOwnsTracking) return;
+    if (tracks.isEmpty || malsyncOwnsTracking) {
+      if (kDebugMode) {
+        debugPrint(
+          '[TrackUpdate] skipping native update '
+          '(tracksEmpty=${tracks.isEmpty} '
+          'malsyncOwnsTracking=$malsyncOwnsTracking)',
+        );
+      }
+      return;
+    }
     for (var track in tracks) {
       final service = isar.trackPreferences
           .filter()
           .syncIdIsNotNull()
           .syncIdEqualTo(track.syncId)
           .findFirstSync();
-      if (!(service == null || chapterNumber <= (track.lastChapterRead ?? 0))) {
+      final shouldUpdate = !(service == null ||
+          chapterNumber <= (track.lastChapterRead ?? 0));
+      if (kDebugMode) {
+        debugPrint(
+          '[TrackUpdate]   native track syncId=${track.syncId} '
+          'service=${service?.syncId} chapterNumber=$chapterNumber '
+          'lastChapterRead=${track.lastChapterRead} '
+          'shouldUpdate=$shouldUpdate',
+        );
+      }
+      if (shouldUpdate) {
         if (track.status != TrackStatus.completed) {
           track.lastChapterRead = chapterNumber;
           if (track.lastChapterRead == track.totalChapter &&
@@ -167,6 +244,13 @@ extension ChapterExtension on Chapter {
               track.startedReadingDate = DateTime.now().millisecondsSinceEpoch;
             }
           }
+        }
+        if (kDebugMode) {
+          debugPrint(
+            '[TrackUpdate]   native update -> '
+            'lastChapterRead=${track.lastChapterRead} '
+            'status=${track.status}',
+          );
         }
         ref
             .read(
@@ -184,8 +268,9 @@ extension ChapterExtension on Chapter {
   static Future<void> _syncViaYuriSync(
     String title,
     int chapterNumber,
-    ItemType itemType,
-  ) async {
+    ItemType itemType, {
+    String? url,
+  }) async {
     final type = itemType == ItemType.anime ? 'anime' : 'manga';
     if (kDebugMode) {
       debugPrint(
@@ -199,12 +284,12 @@ extension ChapterExtension on Chapter {
         type: type,
         chapter: type == 'manga' ? chapterNumber : null,
         episode: type == 'anime' ? chapterNumber : null,
+        url: url,
       );
       if (kDebugMode) {
         debugPrint(
           '[MALSyncTrace] ${DateTime.now().toIso8601String()} track.auto done '
-          'title=$title chapter=$chapterNumber '
-          'resultKeys=${result.keys.join(',')}',
+          'title=$title chapter=$chapterNumber result=$result',
         );
       }
     } catch (error, stack) {

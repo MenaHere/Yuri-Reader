@@ -15,17 +15,23 @@ export async function handleTrackAuto(params: Record<string, unknown>): Promise<
   const chapter = params.chapter as number | undefined;
   const episode = params.episode as number | undefined;
   const progress = chapter ?? episode ?? 1;
+  // The match the user picked by hand wins over a fresh title search: writing
+  // to whatever the search returns first updates a different entry than the
+  // one the app shows, and the user's own entry never moves.
+  const chosen = typeof params.url === 'string' ? (params.url as string) : '';
 
-  // 1. Search for the title
-  const results = await search(title, type, {}, false, provider);
-  if (!results.length) {
-    return { status: 'not_found', title, type, provider };
+  // 1. Resolve the entry: the chosen match, or the first title-search result.
+  let targetUrl = chosen;
+  if (!targetUrl) {
+    const results = await search(title, type, {}, false, provider);
+    if (!results.length) {
+      return { status: 'not_found', title, type, provider };
+    }
+    targetUrl = results[0].url;
   }
 
-  const bestMatch = results[0];
-
   // 2. Get or create entry
-  const single = getSingle(bestMatch.url);
+  const single = getSingle(targetUrl);
   await single.update();
 
   const wasOnList = single.isOnList();
@@ -36,11 +42,17 @@ export async function handleTrackAuto(params: Record<string, unknown>): Promise<
   single.setEpisode(progress);
   await single.sync();
 
+  // Read the entry back: the app has to know whether the write landed, not
+  // just that the call did not throw. `progress` below is what the provider
+  // reports now, and `requested` is what was asked for.
+  await single.update();
+
   return {
     status: wasOnList ? 'updated' : 'added',
     title: single.getTitle(),
     url: single.getUrl(),
-    progress,
+    progress: single.getEpisode(),
+    requested: progress,
     type,
     provider: single.shortName,
   };

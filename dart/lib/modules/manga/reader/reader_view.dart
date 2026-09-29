@@ -1541,6 +1541,13 @@ class _MangaChapterPageGalleryState
     if (_currentPageDisplayIndex.value != idx) {
       _currentPageDisplayIndex.value = idx;
       _updateHasCurrentError();
+      if (kDebugMode) {
+        debugPrint(
+          '[ReaderPage] ${DateTime.now().toIso8601String()} '
+          'page=$idx of ${pages.length} '
+          'chapterIsRead=${chapter.isRead}',
+        );
+      }
       _readerController.setPageIndex(idx, false, _chapterUrlModel.pageUrls);
       ref.read(currentIndexProvider(chapter).notifier).setCurrentIndex(idx);
     }

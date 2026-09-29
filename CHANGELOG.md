@@ -1,5 +1,20 @@
 # Yuri-Reader - Change Log
 
+## Version 0.6.7
+
+### [2026-09-29]
+
+#### Fixed
+- The tracker now bumps when you read a chapter to its last page or watch an
+  episode to its threshold, even if the chapter or episode was already marked
+  read in the app. Previously the reader skipped already-read chapters, so
+  re-reading one never updated the tracker
+- The bump now goes to the entry you picked as the match, not to whatever a
+  fresh title search returns first (which could be a different entry, so your
+  own entry never moved)
+- The MAL-Sync panel re-reads the entry after a sync, so the bumped chapter
+  shows without leaving and re-opening the page
+
 ## Version 0.6.6
 
 ### [2026-09-29]

@@ -6,6 +6,10 @@ import 'package:yuri_reader/modules/malsync/malsync_screen.dart';
 import 'package:yuri_reader/modules/malsync/malsync_style.dart';
 import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';
 
+/// Bumped after a tracker sync so the panel re-reads the entry and shows the
+/// new chapter/status without the user leaving and re-opening the page.
+final ValueNotifier<int> malsyncSyncTick = ValueNotifier<int>(0);
+
 /// malsync's own panel, the one it puts beside a list of chapters: the rating
 /// it shows for the title, then Status, Volume, Chapter and Your Score, each
 /// writing through the bridge as it changes, which is how its own panel works.
@@ -61,11 +65,19 @@ class _MalSyncPanelState extends State<MalSyncPanel> {
     super.initState();
     _progressController = TextEditingController();
     _volumeController = TextEditingController();
+    malsyncSyncTick.addListener(_onSyncTick);
     unawaited(_load());
+  }
+
+  /// A sync elsewhere (reading a chapter to its end) bumps the tick, so the
+  /// panel re-reads the entry and shows the new value in place.
+  void _onSyncTick() {
+    if (!_saving) unawaited(_load());
   }
 
   @override
   void dispose() {
+    malsyncSyncTick.removeListener(_onSyncTick);
     _progressController.dispose();
     _volumeController.dispose();
     super.dispose();
