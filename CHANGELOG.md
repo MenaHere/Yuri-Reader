@@ -1,5 +1,22 @@
 # Yuri-Reader - Change Log
 
+## Version 0.6.8
+
+### [2026-09-29]
+
+#### Added
+- MAL-Sync's own feedback bars in the reader: a result bar at the bottom after
+  a sync, showing the title and the fields it changed, with pink `Undo` /
+  `Wrong?` buttons, and a question bar at the top that asks "Start reading?"
+  and "Set as completed?" (carrying the score dropdown), the way the extension
+  does
+- The manga completion percentage in MAL-Sync settings, the share of a chapter
+  read before the tracker bumps (default 90)
+
+#### Changed
+- The tracker bump fires once, when the configured share of the chapter has
+  been read, instead of at the last page
+
 ## Version 0.6.7
 
 ### [2026-09-29]

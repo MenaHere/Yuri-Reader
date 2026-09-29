@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yuri_reader/modules/malsync/malsync_flash.dart';
 import 'package:yuri_reader/modules/malsync/malsync_style.dart';
 import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';
 
@@ -125,6 +126,9 @@ class _MalSyncSettingsScreenState extends State<MalSyncSettingsScreen> {
   Future<void> _set(String key, dynamic value) async {
     final previous = _settings[key];
     setState(() => _settings = {..._settings, key: value});
+    if (key == 'mangaCompletionPercentage' && value is num && value > 0) {
+      malsyncCompletionPercentage.value = value.toInt();
+    }
     try {
       await YuriSyncService().setSetting(key, value);
     } catch (e) {

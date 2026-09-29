@@ -23,6 +23,7 @@ import 'package:yuri_reader/modules/anime/widgets/desktop.dart';
 import 'package:yuri_reader/modules/manga/reader/mixins/reader_gestures.dart';
 import 'package:yuri_reader/modules/manga/reader/services/page_navigation_service.dart';
 import 'package:yuri_reader/modules/manga/reader/mixins/reader_memory_management.dart';
+import 'package:yuri_reader/modules/malsync/malsync_flash.dart';
 import 'package:yuri_reader/modules/manga/reader/widgets/reader_app_bar.dart';
 import 'package:yuri_reader/modules/manga/reader/widgets/reader_bottom_bar.dart';
 import 'package:yuri_reader/modules/manga/reader/widgets/reader_overlays.dart';
@@ -178,6 +179,9 @@ class _MangaChapterPageGalleryState
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    // MAL-Sync's confirm bar is permanent on a web page; here it must not
+    // follow the user out of the reader.
+    dismissMalSyncConfirm();
     _readingStopwatch.stop();
     _readerController.setHistoryUpdate(
       elapsedSeconds: _readingStopwatch.elapsed.inSeconds,

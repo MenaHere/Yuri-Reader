@@ -12,7 +12,9 @@ import 'package:yuri_reader/models/track.dart';
 import 'package:yuri_reader/models/track_preference.dart';
 import 'package:yuri_reader/modules/manga/detail/providers/track_state_providers.dart';
 import 'package:yuri_reader/modules/manga/reader/providers/push_router.dart';
+import 'package:yuri_reader/modules/malsync/malsync_flash.dart';
 import 'package:yuri_reader/modules/malsync/malsync_panel.dart';
+import 'package:yuri_reader/router/router.dart';
 import 'package:yuri_reader/utils/extensions/manga_extensions.dart';
 import 'package:yuri_reader/modules/more/settings/track/providers/track_providers.dart';
 import 'package:yuri_reader/modules/tracker_library/tracker_library_screen.dart';
@@ -191,16 +193,12 @@ extension ChapterExtension on Chapter {
       );
     }
     unawaited(
-      _syncViaYuriSync(
+      _syncWithConfirmations(
         manga.name!,
         chapterNumber,
         manga.itemType,
-        url: matchUrl,
-      ).whenComplete(() {
-        // Re-read the panel so the bumped value shows without the user leaving
-        // the page and opening it again.
-        malsyncSyncTick.value++;
-      }),
+        matchUrl,
+      ),
     );
 
     if (tracks.isEmpty || malsyncOwnsTracking) {
@@ -265,11 +263,119 @@ extension ChapterExtension on Chapter {
     }
   }
 
+  /// The MAL-Sync-style questions before a bump: "Start reading?" when the
+  /// entry is not started, and "Set as completed?" when the chapter is the
+  /// last one. Saying no to the first skips the write; saying no to the second
+  /// still bumps the progress but leaves the status reading.
+  static Future<void> _syncWithConfirmations(
+    String title,
+    int chapterNumber,
+    ItemType itemType,
+    String? matchUrl,
+  ) async {
+    final type = itemType == ItemType.anime ? 'anime' : 'manga';
+    int? total;
+    int? status;
+    List<Map<String, dynamic>> scoreOptions = [];
+    try {
+      final result = await YuriSyncService().entryFind(
+        title: title,
+        type: type,
+        url: matchUrl,
+      );
+      final entry = result['entry'];
+      if (entry is Map) {
+        total = (entry['totalEpisodes'] as num?)?.toInt();
+        status = (entry['status'] as num?)?.toInt();
+      }
+      final options = result['scoreOptions'];
+      if (options is List) {
+        scoreOptions = options
+            .whereType<Map>()
+            .cast<Map<String, dynamic>>()
+            .toList();
+      }
+    } catch (error) {
+      debugPrint(
+        '[TrackUpdate] could not read the entry before syncing: $error',
+      );
+    }
+
+    // "Start reading?" - the entry is not started (plan to read / considering).
+    final started = status != null && status != 0 && status != 5 && status != 7;
+    if (!started) {
+      final (ok, _) = await _confirmWithScore(
+        itemType == ItemType.anime ? 'Start watching?' : 'Start reading?',
+      );
+      if (!ok) return;
+    }
+
+    // "Set as completed?" - this is the last chapter/episode. The bar carries
+    // the score dropdown, and a Yes applies the chosen score.
+    int? statusToSet;
+    int? scoreToSet;
+    final isLast = total != null && total > 0 && chapterNumber >= total;
+    if (isLast) {
+      final (ok, score) = await _confirmWithScore(
+        'Set as completed?',
+        scoreOptions,
+      );
+      if (ok) {
+        statusToSet = 2; // malsync status.Completed
+        scoreToSet = score;
+      }
+    }
+
+    await _syncViaYuriSync(
+      title,
+      chapterNumber,
+      itemType,
+      url: matchUrl,
+      status: statusToSet,
+      score: scoreToSet,
+    );
+  }
+
+  /// A Yes/No question at the top of the screen, the way MAL-Sync asks. An
+  /// optional score dropdown rides on the bar, as the "Set as completed?"
+  /// question carries one.
+  static Future<(bool, int?)> _confirmWithScore(
+    String message, [
+    List<Map<String, dynamic>> scoreOptions = const [],
+  ]) async {
+    final context = navigatorKey.currentContext;
+    if (context == null || !context.mounted) return (true, null);
+    final overlay = navigatorKey.currentState?.overlay;
+    if (overlay == null) return (true, null);
+    final completer = Completer<(bool, int?)>();
+    late OverlayEntry entry;
+    void finish(bool answer, int? score) {
+      dismissMalSyncConfirm();
+      if (!completer.isCompleted) completer.complete((answer, score));
+    }
+
+    entry = OverlayEntry(
+      builder: (context) => MalSyncFlashConfirm(
+        message: message,
+        scoreOptions: scoreOptions,
+        onAnswer: finish,
+      ),
+    );
+    overlay.insert(entry);
+    // Leaving the reader answers "no": the bar must not follow the user out.
+    registerMalSyncConfirm(entry, () {
+      if (!completer.isCompleted) completer.complete((false, null));
+    });
+    return completer.future;
+  }
+
   static Future<void> _syncViaYuriSync(
     String title,
     int chapterNumber,
     ItemType itemType, {
     String? url,
+    int? status,
+    int? score,
   }) async {
     final type = itemType == ItemType.anime ? 'anime' : 'manga';
     if (kDebugMode) {
@@ -285,6 +391,8 @@ extension ChapterExtension on Chapter {
         chapter: type == 'manga' ? chapterNumber : null,
         episode: type == 'anime' ? chapterNumber : null,
         url: url,
+        status: status,
+        score: score,
       );
       if (kDebugMode) {
         debugPrint(
@@ -292,11 +400,88 @@ extension ChapterExtension on Chapter {
           'title=$title chapter=$chapterNumber result=$result',
         );
       }
+      // Re-read the panel so the bumped value shows without the user leaving
+      // the page and opening it again.
+      malsyncSyncTick.value++;
+      _showSyncResult(
+        result,
+        title: title,
+        chapterNumber: chapterNumber,
+        itemType: itemType,
+        statusSet: status != null,
+        scoreSet: score != null,
+      );
     } catch (error, stack) {
       debugPrint(
         '[MALSyncTrace] ${DateTime.now().toIso8601String()} track.auto failed '
         'title=$title chapter=$chapterNumber error=$error\n$stack',
       );
     }
+  }
+
+  /// The bottom pop-up after a sync, the way MAL-Sync answers a finished
+  /// chapter: the title, then `Volume: X/Y | Chapter: X/Y`, then the pink
+  /// `Undo` / `Wrong?` buttons.
+  static void _showSyncResult(
+    Map<String, dynamic> result, {
+    required String title,
+    required int chapterNumber,
+    required ItemType itemType,
+    required bool statusSet,
+    required bool scoreSet,
+  }) {
+    final context = navigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+    final type = result['type'] == 'anime' ? 'anime' : 'manga';
+    final status = (result['entryStatus'] as num?)?.toInt() ?? 0;
+    final volume = (result['volume'] as num?)?.toInt() ?? 0;
+    final totalVolumes = (result['totalVolumes'] as num?)?.toInt() ?? 0;
+    final episode = (result['episode'] as num?)?.toInt() ?? 0;
+    final totalEpisodes = (result['totalEpisodes'] as num?)?.toInt() ?? 0;
+    final score = (result['score'] as num?)?.toInt() ?? 0;
+
+    final parts = <String>[];
+    final statusWord = _statusWord(status, type);
+    // The status word appears only when this sync set one, the way MAL-Sync
+    // shows a field only when it changed.
+    if (statusSet && statusWord.isNotEmpty) parts.add(statusWord);
+    if (volume > 0) {
+      parts.add('Volume: $volume/${totalVolumes > 0 ? totalVolumes : '?'}');
+    }
+    if (episode > 0) {
+      final label = type == 'anime' ? 'Episode:' : 'Chapter:';
+      parts.add('$label $episode/${totalEpisodes > 0 ? totalEpisodes : '?'}');
+    }
+    if (scoreSet && score > 0) parts.add('Your Score: $score');
+
+    final message = parts.isEmpty ? title : '$title\n${parts.join(' | ')}';
+    showMalSyncFlash(
+      message,
+      onUndo: () => _syncViaYuriSync(
+        title,
+        chapterNumber > 1 ? chapterNumber - 1 : 0,
+        itemType,
+        url: result['url'] as String?,
+      ),
+      onWrong: () {
+        debugPrint(
+          '[MALSyncTrace] wrong-match reported for $title '
+          'chapter=$chapterNumber',
+        );
+      },
+    );
+  }
+
+  static String _statusWord(int status, String type) {
+    return switch (status) {
+      1 => type == 'anime' ? 'Watching' : 'Reading',
+      2 => 'Completed',
+      3 => 'On Hold',
+      4 => 'Dropped',
+      5 => type == 'anime' ? 'Plan to Watch' : 'Plan to Read',
+      6 => type == 'anime' ? 'Rewatching' : 'Rereading',
+      7 => 'Considering',
+      _ => '',
+    };
   }
 }

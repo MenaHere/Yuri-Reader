@@ -25,6 +25,7 @@ import 'package:yuri_reader/repositories/track_repository.dart';
 import 'package:yuri_reader/models/track.dart' as track;
 import 'package:yuri_reader/models/track_search.dart';
 import 'package:yuri_reader/modules/manga/detail/providers/track_state_providers.dart';
+import 'package:yuri_reader/modules/malsync/malsync_flash.dart';
 import 'package:yuri_reader/modules/more/data_and_storage/providers/storage_usage.dart';
 import 'package:yuri_reader/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:yuri_reader/modules/more/settings/general/providers/general_state_provider.dart';
@@ -259,6 +260,25 @@ class _MyAppState extends ConsumerState<MyApp>
             .read(totalChapterCacheSizeStateProvider.notifier)
             .clearCache(showToast: false);
       }
+    });
+
+    // The manga completion percentage lives in the sync service's settings;
+    // load it so the reader bumps the tracker at the configured share.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(seconds: 3), () async {
+        if (!mounted) return;
+        try {
+          final settings = await YuriSyncService().settingsList();
+          final value = settings['mangaCompletionPercentage'];
+          if (value is num && value > 0) {
+            malsyncCompletionPercentage.value = value.toInt();
+          }
+        } catch (error) {
+          debugPrint(
+            '[MALSyncTrace] could not load the completion percentage: $error',
+          );
+        }
+      });
     });
   }
 

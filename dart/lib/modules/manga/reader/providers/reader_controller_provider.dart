@@ -10,6 +10,7 @@ import 'package:yuri_reader/modules/more/providers/incognito_mode_state_provider
 import 'package:yuri_reader/repositories/chapter_repository.dart';
 import 'package:yuri_reader/repositories/settings_repository.dart';
 import 'package:yuri_reader/modules/more/settings/downloads/providers/downloads_state_provider.dart';
+import 'package:yuri_reader/modules/malsync/malsync_flash.dart';
 import 'package:yuri_reader/utils/extensions/chapter_extensions.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'reader_controller_provider.g.dart';
@@ -125,6 +126,9 @@ class ReaderController extends _$ReaderController
   }
 
   int? _lastSavedIndex;
+  // The tracker bump fires once per chapter, when the completion threshold is
+  // first crossed - not on every page after it.
+  bool _syncThresholdFired = false;
   void setPageIndex(
     int newIndex,
     bool save, [
@@ -138,7 +142,11 @@ class ReaderController extends _$ReaderController
     final isRead = isContinuousLike
         ? (newIndex + 2) >= pageLength - 1
         : (newIndex + 2) >= pageLength;
-    if (isRead || save) {
+    // MAL-Sync bumps the tracker at the configured completion percentage
+    // (mangaCompletionPercentage, default 90), not at the very end.
+    final atSyncThreshold = !_syncThresholdFired &&
+        newIndex >= (pageLength * malsyncCompletionPercentage.value / 100).floor();
+    if (isRead || atSyncThreshold || save) {
       void executeSave() {
         if (incognitoMode) return;
         List<ChapterPageIndex>? chapterPageIndexs = [];
@@ -158,9 +166,10 @@ class ReaderController extends _$ReaderController
         }
         if (!ref.mounted) return;
         // MAL-Sync tracks reading, not the app's read state: reaching the
-        // last page must bump the tracker even when the chapter is already
-        // marked read (the reader skips read chapters otherwise).
-        if (isRead) {
+        // sync threshold must bump the tracker even when the chapter is
+        // already marked read (the reader skips read chapters otherwise).
+        if (atSyncThreshold) {
+          _syncThresholdFired = true;
           chapter.updateTrackChapterRead(ref);
         }
         if (chapter.isRead!) return;

@@ -102,6 +102,8 @@ class YuriSyncService {
     int? episode,
     String? provider,
     String? url,
+    int? status,
+    int? score,
   }) async {
     final params = <String, dynamic>{
       'title': title,
@@ -110,6 +112,8 @@ class YuriSyncService {
       'episode': episode,
       'provider': provider,
       'url': url,
+      'status': status,
+      'score': score,
     };
     final response = await _call('track.auto', params);
     if (response['error'] != null) {

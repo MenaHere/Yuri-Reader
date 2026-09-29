@@ -19,6 +19,10 @@ export async function handleTrackAuto(params: Record<string, unknown>): Promise<
   // to whatever the search returns first updates a different entry than the
   // one the app shows, and the user's own entry never moves.
   const chosen = typeof params.url === 'string' ? (params.url as string) : '';
+  // An explicit status (e.g. Completed after the "Set as completed?" question).
+  const status = typeof params.status === 'number' ? (params.status as number) : undefined;
+  // An explicit score, chosen in the "Set as completed?" bar.
+  const score = typeof params.score === 'number' ? (params.score as number) : undefined;
 
   // 1. Resolve the entry: the chosen match, or the first title-search result.
   let targetUrl = chosen;
@@ -38,6 +42,12 @@ export async function handleTrackAuto(params: Record<string, unknown>): Promise<
   if (!wasOnList) {
     single.setStatus(definitions.status.Watching);
   }
+  if (status !== undefined) {
+    single.setStatus(status);
+  }
+  if (score !== undefined) {
+    single.handleScoreCheckbox(score);
+  }
 
   single.setEpisode(progress);
   await single.sync();
@@ -55,5 +65,12 @@ export async function handleTrackAuto(params: Record<string, unknown>): Promise<
     requested: progress,
     type,
     provider: single.shortName,
+    // The entry state MAL-Sync shows in its result line:
+    // Title | Status | Volume X/Y | Chapter X/Y | Score Z
+    entryStatus: single.getStatus(),
+    volume: single.getVolume(),
+    totalVolumes: single.getTotalVolumes(),
+    totalEpisodes: single.getTotalEpisodes(),
+    score: single.getScore(),
   };
 }
