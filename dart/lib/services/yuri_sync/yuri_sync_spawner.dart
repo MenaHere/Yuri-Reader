@@ -33,8 +33,14 @@ class YuriSyncSpawner {
           ready.complete(_port!);
         }
       },
-      onError: (Object _) {},
+      onError: (Object error) => debugPrint(
+        '[YuriSyncService] ${DateTime.now().toIso8601String()} '
+        'stdout stream failed: $error',
+      ),
       onDone: () {
+        debugPrint(
+          '[YuriSyncService] ${DateTime.now().toIso8601String()} stdout closed',
+        );
         if (!ready.isCompleted) {
           ready.completeError(Exception('Yuri-Sync did not report ready'));
         }
@@ -43,7 +49,18 @@ class YuriSyncSpawner {
     _process!.stderr
         .transform(utf8.decoder)
         .transform(const LineSplitter())
-        .listen(debugPrint, onError: (Object _) {}, onDone: () {});
+        .listen(
+      (line) => debugPrint(
+        '[YuriSyncService] ${DateTime.now().toIso8601String()} $line',
+      ),
+      onError: (Object error) => debugPrint(
+        '[YuriSyncService] ${DateTime.now().toIso8601String()} '
+        'stderr stream failed: $error',
+      ),
+      onDone: () => debugPrint(
+        '[YuriSyncService] ${DateTime.now().toIso8601String()} stderr closed',
+      ),
+    );
 
     // Dying before it is ready must be reported, not waited on.
     unawaited(

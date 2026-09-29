@@ -110,7 +110,9 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
               .map((e) => "${e.name}=${e.value}")
               .join(";");
           await MClient.setCookie(_url, ua, null, cookie: cookie);
-        } catch (_) {}
+        } catch (error) {
+          debugPrint('[Webview] could not pass cookies to the app: $error');
+        }
       });
       _desktopWebview!
         ..setBrightness(Brightness.dark)

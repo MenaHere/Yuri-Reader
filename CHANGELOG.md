@@ -1,5 +1,23 @@
 # Yuri-Reader - Change Log
 
+## Version 0.6.5
+
+### [2026-09-29]
+
+#### Fixed
+- A chapter page list saved to disk could point at the extension server's own
+  image proxy (`http://127.0.0.1:<port>/image/<id>`), whose port and tokens
+  belong to one server process. After that process restarted, every page of the
+  chapter failed to load and the reader's Retry kept repeating the same dead
+  request. Page lists from the proxy are no longer cached, and one already on
+  disk is dropped, so the list is fetched fresh
+- The reader's top-bar Refresh invalidated the reader before removing the
+  cached page list, so the rebuild reused the stale list. It now removes the
+  cache and invalidates the page-list provider first
+- WebP chapter images now decode on Linux (the decoder only handled jpeg, png
+  and avif, so WebP chapters failed there while Android's platform decoder
+  opened them)
+
 ## Version 0.6.4
 
 ### [2026-09-27]

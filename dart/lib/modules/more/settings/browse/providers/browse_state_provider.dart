@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http_interceptor/http_interceptor.dart';
 import 'package:yuri_reader/models/manga.dart';
@@ -190,7 +191,9 @@ class ExtensionsRepoState extends _$ExtensionsRepoState {
         ).future,
       );
       await refresh;
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[Browse] could not refresh the extension list: $error');
+    }
   }
 }
 
@@ -258,7 +261,9 @@ Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
           jsonUrl: result.indexUrl,
         );
       }
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[Browse] could not read a repo manifest: $error');
+    }
   }
 
   // 2. Fallback for custom / legacy JSON list format
@@ -278,7 +283,9 @@ Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
                 infos.addAll(decoded);
               }
             }
-          } catch (_) {}
+          } catch (error) {
+            debugPrint('[Browse] could not read repo.json for $baseUrl: $error');
+          }
         }
         infos["jsonUrl"] = url;
         final repo = Repo.fromJson(infos);
@@ -291,7 +298,9 @@ Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
         }
         return repo;
       }
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[Browse] could not read an extension repo at $url: $error');
+    }
   }
 
   return null;

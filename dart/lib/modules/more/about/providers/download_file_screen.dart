@@ -51,7 +51,9 @@ class _DownloadFileScreenState extends ConsumerState<DownloadFileScreen> {
           _currentVersion = info.version;
         });
       }
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[About] could not read the current version: $error');
+    }
   }
 
   @override
@@ -356,7 +358,9 @@ class _DownloadFileScreenState extends ConsumerState<DownloadFileScreen> {
             if (_isDownloading) {
               try {
                 await _subscription?.cancel();
-              } catch (_) {}
+              } catch (error) {
+                debugPrint('[About] could not cancel the download stream: $error');
+              }
             }
             if (context.mounted) {
               Navigator.pop(context);

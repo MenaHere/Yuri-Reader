@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 class YuriSyncClient {
   final String host;
   final int port;
@@ -72,7 +74,12 @@ class YuriSyncClient {
       if (id != null && _pending.containsKey(id)) {
         _pending.remove(id)!.complete(response);
       }
-    } catch (_) {}
+    } catch (error) {
+      debugPrint(
+        '[YuriSyncClient] ${DateTime.now().toIso8601String()} '
+        'unreadable response line: $error',
+      );
+    }
   }
 
   void disconnect() {

@@ -82,7 +82,9 @@ class _MalSyncScreenState extends State<MalSyncScreen> {
       final settings = await YuriSyncService().settingsList();
       if (!mounted) return;
       setState(() => _service = '${settings['syncMode'] ?? ''}');
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[MalsyncScreen] could not read the sync service: $error');
+    }
   }
 
   /// Their list is searched client side too, so the search box does not

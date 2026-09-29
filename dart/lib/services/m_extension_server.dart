@@ -95,12 +95,20 @@ class MExtensionServerPlatform {
           } else {
             try {
               await MExtensionServer().stopServer();
-            } catch (_) {}
+            } catch (error) {
+              debugPrint(
+                '[ExtensionServer] could not stop the rejected server: $error',
+              );
+            }
           }
         }
         if (localBaseUrl == null) return;
         if (Platform.isIOS) _iosActiveBaseUrl = localBaseUrl;
         ref.read(androidProxyServerStateProvider.notifier).set(localBaseUrl);
+        debugPrint(
+          '[ExtensionServerTrace] ${DateTime.now().toIso8601String()} '
+          'server ready baseUrl=$localBaseUrl',
+        );
       }
     } catch (e) {
       debugPrint('[ExtensionServer] Failed to start server: $e');
@@ -120,7 +128,11 @@ class MExtensionServerPlatform {
             res.body.contains('"mangayomiMihonBridge"')) {
           return true;
         }
-      } catch (_) {}
+      } catch (error) {
+        debugPrint(
+          '[ExtensionServer] probe $baseUrl attempt ${i + 1} failed: $error',
+        );
+      }
       await Future.delayed(const Duration(milliseconds: 250));
     }
     return false;
@@ -131,7 +143,9 @@ class MExtensionServerPlatform {
       if (Platform.isIOS) await _iosStartOperation;
       await MExtensionServer().stopServer();
       if (Platform.isIOS) _iosActiveBaseUrl = null;
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[ExtensionServer] could not stop the server: $error');
+    }
   }
 
   Future<bool> checkLocalServer() async =>

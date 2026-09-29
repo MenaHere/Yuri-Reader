@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
@@ -74,20 +75,28 @@ extension ChapterExtension on Chapter {
     try {
       final cbzFile = File(p.join(mangaDir!.path, "$name.cbz"));
       if (cbzFile.existsSync()) cbzFile.deleteSync();
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[DeleteDownloaded] could not delete the cbz: $error');
+    }
     try {
       final mp4File = File(
         p.join(mangaDir!.path, "${name!.replaceForbiddenCharacters(' ')}.mp4"),
       );
       if (mp4File.existsSync()) mp4File.deleteSync();
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[DeleteDownloaded] could not delete the mp4: $error');
+    }
     try {
       final htmlFile = File(p.join(mangaDir!.path, "$name.html"));
       if (htmlFile.existsSync()) htmlFile.deleteSync();
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[DeleteDownloaded] could not delete the html: $error');
+    }
     try {
       chapterDir?.deleteSync(recursive: true);
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[DeleteDownloaded] could not delete the chapter dir: $error');
+    }
 
     cancelDownloads(download.id);
   }
@@ -124,6 +133,14 @@ extension ChapterExtension on Chapter {
         .findFirstSync() != null;
 
     // Always attempt to sync via the Yuri-Sync MALSync bridge (fire-and-forget).
+    if (kDebugMode) {
+      debugPrint(
+        '[MALSyncTrace] ${DateTime.now().toIso8601String()} '
+        'chapter-complete title=${manga.name} chapter=$name '
+        'chapterNumber=$chapterNumber tracks=${tracks.length} '
+        'malsyncOwnsTracking=$malsyncOwnsTracking',
+      );
+    }
     unawaited(
       _syncViaYuriSync(manga.name!, chapterNumber, manga.itemType),
     );
@@ -169,16 +186,32 @@ extension ChapterExtension on Chapter {
     int chapterNumber,
     ItemType itemType,
   ) async {
+    final type = itemType == ItemType.anime ? 'anime' : 'manga';
+    if (kDebugMode) {
+      debugPrint(
+        '[MALSyncTrace] ${DateTime.now().toIso8601String()} track.auto start '
+        'title=$title chapter=$chapterNumber type=$type',
+      );
+    }
     try {
-      final type = itemType == ItemType.anime ? 'anime' : 'manga';
-      await YuriSyncService().trackAuto(
+      final result = await YuriSyncService().trackAuto(
         title: title,
         type: type,
         chapter: type == 'manga' ? chapterNumber : null,
         episode: type == 'anime' ? chapterNumber : null,
       );
-    } catch (_) {
-      // Silently ignore bridge errors so they never break the reader.
+      if (kDebugMode) {
+        debugPrint(
+          '[MALSyncTrace] ${DateTime.now().toIso8601String()} track.auto done '
+          'title=$title chapter=$chapterNumber '
+          'resultKeys=${result.keys.join(',')}',
+        );
+      }
+    } catch (error, stack) {
+      debugPrint(
+        '[MALSyncTrace] ${DateTime.now().toIso8601String()} track.auto failed '
+        'title=$title chapter=$chapterNumber error=$error\n$stack',
+      );
     }
   }
 }

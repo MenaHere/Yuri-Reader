@@ -1685,7 +1685,8 @@ static unsigned char* decode_avif_rgba(const char* file_path, int* out_w, int* o
 }
 #endif // HAVE_LIBAVIF
 
-// TODO: tmp fix, awaiting upstream fix
+// TODO: temp fix, awaiting upstream merge. WebP decoding for the Linux
+// decoder; upstream only handled jpeg/png/avif.
 // WebP decoding via libwebp (dynamically loaded for cross-distro compatibility)
 #ifdef HAVE_LIBWEBP
 #include <dlfcn.h>

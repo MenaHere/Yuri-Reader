@@ -60,6 +60,7 @@ pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
 find_package(JPEG)
 find_package(PNG)
 pkg_check_modules(AVIF IMPORTED_TARGET libavif)
+# TODO: temp fix, awaiting upstream merge. WebP support for the Linux decoder.
 pkg_check_modules(WEBP IMPORTED_TARGET libwebp)
 
 add_definitions(-DAPPLICATION_ID="${APPLICATION_ID}")

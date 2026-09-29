@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:http_interceptor/http_interceptor.dart';
 import 'package:intl/intl.dart';
@@ -292,7 +294,9 @@ class MyAnimeList extends _$MyAnimeList implements BaseTracker {
         "yyyy-MM-dd",
         "en_US",
       ).format(DateTime.fromMillisecondsSinceEpoch(epochTime!));
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[MyAnimeList] could not format a date: $error');
+    }
     return date;
   }
 

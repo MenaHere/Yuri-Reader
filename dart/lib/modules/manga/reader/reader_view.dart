@@ -281,6 +281,17 @@ class _MangaChapterPageGalleryState
   }
 
   void _onFailedToLoadImage(int index, bool failed) {
+    if (failed && kDebugMode && index >= 0 && index < pages.length) {
+      final page = pages[index];
+      debugPrint(
+        '[ReaderLoadTrace] ${DateTime.now().toIso8601String()} '
+        'page-failed displayedChapter=${chapter.id}:${chapter.name} '
+        'pageChapter=${page.chapter?.id}:${page.chapter?.name} '
+        'pageIndex=$index chapterPageIndex=${page.index} '
+        'chapterUrl=${page.chapter?.url} imageUrl=${page.pageUrl?.url} '
+        'localPath=${page.localImagePath ?? page.resolvedFilePath}',
+      );
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final current = Set<int>.from(_failedPageIndexes.value);
       final bool changed = failed ? current.add(index) : current.remove(index);
@@ -769,10 +780,16 @@ class _MangaChapterPageGalleryState
                   onRefreshPressed:
                       (chapter.manga.value!.isLocalArchive ?? false) == false
                       ? () async {
+                          // TODO: temp fix, awaiting upstream merge. Upstream
+                          // invalidated the reader before removing the cached
+                          // page list, so the rebuild reused the stale list.
+                          await ChapterCache().remove(chapter);
                           if (chapter.id != null) {
+                            ref.invalidate(
+                              getChapterPagesProvider(chapter: chapter),
+                            );
                             ref.invalidate(mangaReaderProvider(chapter.id!));
                           }
-                          await ChapterCache().remove(chapter);
                           if (context.mounted) {
                             pushReplacementMangaReaderView(
                               chapter: chapter,
@@ -813,7 +830,11 @@ class _MangaChapterPageGalleryState
                         index: jumpIndex,
                         readerMode: ref.read(_currentReaderMode)!,
                       );
-                    } catch (_) {}
+                    } catch (error) {
+                      debugPrint(
+                        '[Reader] could not jump to the selected page: $error',
+                      );
+                    }
                   },
                   onReaderModeChanged: (mode, ref) {
                     ref.read(_currentReaderMode.notifier).state = mode;
@@ -1162,7 +1183,9 @@ class _MangaChapterPageGalleryState
           _isLastPageTransition = true;
         });
       }
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[Reader] could not add the last-chapter page: $error');
+    }
   }
 
   void _preloadNextChapter(GetChapterPagesModel chapterData, Chapter chap) {
@@ -1178,7 +1201,9 @@ class _MangaChapterPageGalleryState
           setState(() {});
         }
       });
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[Reader] could not append the next chapter: $error');
+    }
   }
 
   // bidirectional proactive chapter preloading ──
