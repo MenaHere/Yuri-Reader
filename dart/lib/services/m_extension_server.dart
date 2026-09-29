@@ -11,6 +11,10 @@ import 'package:yuri_reader/utils/platform_utils.dart';
 class MExtensionServerPlatform {
   static Future<void>? _iosStartOperation;
   static String? _iosActiveBaseUrl;
+  // True once this app run has started (and verified) its own server. Any
+  // server answering on the stored base URL before that is a leftover from a
+  // previous run and must not be reused.
+  static bool _serverStartedThisRun = false;
 
   WidgetRef ref;
   MExtensionServerPlatform(this.ref);
@@ -45,7 +49,20 @@ class MExtensionServerPlatform {
 
   Future<void> _startServer({String? baseUrl}) async {
     try {
-      final isRunning = baseUrl == null ? await check() : await _check(baseUrl);
+      var isRunning = baseUrl == null ? await check() : await _check(baseUrl);
+      if (isRunning && _serverStartedThisRun) {
+        // Our own server from this run is already up; keep it.
+        return;
+      }
+      if (isRunning) {
+        // A server answering on the stored base URL that this run did not
+        // start can only be a leftover from a previous run: the app never
+        // keeps its server across runs, and reusing one is what breaks with a
+        // broken pipe (it may belong to a different storage or session, or be
+        // half-dead). Kill it and start our own below.
+        await _killLeftoverServer(baseUrl ?? _baseUrl);
+        isRunning = false;
+      }
       if (!isRunning) {
         // Binding then immediately closing just to learn a free port number
         // is inherently racy: JVM startup takes real time, and on Windows
@@ -104,6 +121,7 @@ class MExtensionServerPlatform {
         }
         if (localBaseUrl == null) return;
         if (Platform.isIOS) _iosActiveBaseUrl = localBaseUrl;
+        _serverStartedThisRun = true;
         ref.read(androidProxyServerStateProvider.notifier).set(localBaseUrl);
         debugPrint(
           '[ExtensionServerTrace] ${DateTime.now().toIso8601String()} '
@@ -136,6 +154,54 @@ class MExtensionServerPlatform {
       await Future.delayed(const Duration(milliseconds: 250));
     }
     return false;
+  }
+
+  /// Kills a leftover extension server JVM from a previous run that is still
+  /// listening on [baseUrl]'s port.
+  ///
+  /// The native plugin only knows the process it started itself, so a server
+  /// left behind by an earlier run has to be found by its command line: it is
+  /// the JVM whose arguments name the extension server jar and this port.
+  Future<void> _killLeftoverServer(String baseUrl) async {
+    if (!Platform.isLinux) return;
+    final port = Uri.tryParse(baseUrl)?.port;
+    if (port == null || port <= 0) return;
+    try {
+      final procDir = Directory('/proc');
+      if (!await procDir.exists()) return;
+      await for (final entry in procDir.list(followLinks: false)) {
+        if (entry is! Directory) continue;
+        final pid = int.tryParse(entry.path.split('/').last);
+        if (pid == null) continue;
+        try {
+          final args = File(
+            '${entry.path}/cmdline',
+          ).readAsStringSync().split('\u0000');
+          final isExtensionServer = args.any(
+            (arg) => arg.contains('MExtensionServer'),
+          );
+          final isOnPort = args.any((arg) => arg == port.toString());
+          if (isExtensionServer && isOnPort) {
+            debugPrint(
+              '[ExtensionServer] killing leftover server pid=$pid port=$port',
+            );
+            Process.killPid(pid);
+          }
+        } catch (error) {
+          // A short-lived process can vanish between listing /proc and reading
+          // its command line; that is not a failure worth reporting.
+          if (error is! PathNotFoundException) {
+            debugPrint(
+              '[ExtensionServer] could not read pid $pid command line: $error',
+            );
+          }
+        }
+      }
+    } catch (error) {
+      debugPrint(
+        '[ExtensionServer] could not scan for a leftover server: $error',
+      );
+    }
   }
 
   Future<void> stopServer() async {

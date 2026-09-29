@@ -413,7 +413,15 @@ class _MyAppState extends ConsumerState<MyApp>
   void onWindowClose() {
     WindowGeometry.save();
     // Workaround for libepoxy error when closing app; caused by media-kit
-    if (Platform.isLinux) exit(0);
+    if (Platform.isLinux) {
+      // exit(0) below skips dispose(), so the extension server has to be
+      // stopped here: without it its JVM survives the app, and the next run
+      // reuses that stale server and breaks with a broken pipe.
+      MExtensionServerPlatform(ref)
+          .stopServer()
+          .timeout(const Duration(seconds: 2), onTimeout: () {})
+          .whenComplete(() => exit(0));
+    }
   }
 
   Future<void> _initDeepLinks() async {

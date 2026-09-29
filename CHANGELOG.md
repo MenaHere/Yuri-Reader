@@ -1,5 +1,16 @@
 # Yuri-Reader - Change Log
 
+## Version 0.6.6
+
+### [2026-09-29]
+
+#### Fixed
+- The app could reuse an extension server left behind by a previous run
+  instead of starting its own. Requests to that stale server failed with a
+  broken pipe, and every extension screen showed "Something went wrong". It
+  now stops a leftover server before starting a fresh one, and stops its own
+  server when the window closes so it does not leave one behind
+
 ## Version 0.6.5
 
 ### [2026-09-29]
