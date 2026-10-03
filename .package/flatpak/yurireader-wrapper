@@ -2,7 +2,4 @@
 # SPDX-License-Identifier: Apache-2.0
 # Launches the app unpacked from the extra-data by apply_extra.sh.
 set -eu
-# Prefer the libs shipped in the extra-data bundle (libmpv and its codec
-# stack); the executable's own rpath points here too.
-export LD_LIBRARY_PATH="/app/extra/bundle/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 exec /app/extra/bundle/yurireader "$@"

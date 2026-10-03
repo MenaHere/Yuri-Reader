@@ -87,14 +87,32 @@ if [ "$PLATFORM" = "linux" ]; then
     exit 1
   fi
 
+  # Copy libmpv's shared-library closure into bundle/lib, but never anything the
+  # C runtime, the compiler, or a desktop/Flatpak runtime already provides. The
+  # host glib/GTK/Wayland stack must NOT be bundled: inside the Flatpak it
+  # shadows the runtime's newer libraries and breaks them (the runner's glib
+  # 2.80 made the runtime's libgstreamer fail with
+  # "undefined symbol: g_sort_array").
+  copied=()
   copy_closure() {
     local lib="$1" base dep
     base="$(basename "$lib")"
     if [ -e "$libdir/$base" ]; then return 0; fi
     case "$base" in
-      libc.so*|libm.so*|libdl.so*|libpthread.so*|librt.so*|libgcc_s.so*|libstdc++.so*|ld-linux*) return 0 ;;
+      libc.so*|libm.so*|libdl.so*|libpthread.so*|librt.so*|libresolv.so*|libnsl.so*|libgcc_s.so*|libstdc++.so*|ld-linux*) return 0 ;;
+      libglib-2.0*|libgobject-2.0*|libgio-2.0*|libgmodule-2.0*|libgthread-2.0*) return 0 ;;
+      libgst*|libgtk*|libgdk*|libpango*|libcairo*|libatk*|libgraphene*) return 0 ;;
+      libharfbuzz*|libfontconfig*|libfreetype*|libfribidi*|libexpat*) return 0 ;;
+      libwayland*|libX*|libxcb*|libxkbcommon*|libgbm*|libdrm*|libepoxy*|libEGL*|libGL*|libvulkan*|libva*|libvdpau*) return 0 ;;
+      libpulse*|libasound*|libpipewire*|libsndfile*) return 0 ;;
+      libjpeg*|libpng*|libtiff*|libwebp*|libgif*) return 0 ;;
+      libz.so*|liblzma*|libbz2*|libzstd*|libbrotli*|liblz4*) return 0 ;;
+      libdbus-1*|libsystemd*|libselinux*|libmount*|libblkid*|libuuid*) return 0 ;;
+      libffi*|libpcre*|libgcrypt*|libgpg-error*|libcrypto*|libssl*|libcurl*|libnghttp2*) return 0 ;;
+      libsqlite3*|libxml2*|libicu*|liborc*|libgudev*|libudev*) return 0 ;;
     esac
     cp -L "$lib" "$libdir/$base"
+    copied+=("$libdir/$base")
     while read -r dep; do
       case "$dep" in /*) copy_closure "$dep" ;; esac
     done < <(ldd "$lib" 2>/dev/null | awk '/=> \//{print $3}')
@@ -102,9 +120,24 @@ if [ "$PLATFORM" = "linux" ]; then
   }
   copy_closure "$mpv"
 
-  # libmpv's own dependencies are transitive, and DT_RUNPATH is not inherited;
-  # force a DT_RPATH on the executable so the loader searches lib/ for them.
-  patchelf --force-rpath --set-rpath '$ORIGIN/lib' "$bundle/yurireader"
+  # Point each bundled library at its own directory so its dependencies resolve
+  # inside bundle/lib; the executable already carries $ORIGIN/lib and finds
+  # libmpv directly. Nothing outside the media stack is shadowed, so the
+  # Flatpak runtime keeps its own glib/GTK/gstreamer.
+  for f in "${copied[@]}"; do
+    patchelf --set-rpath '$ORIGIN' "$f"
+  done
+
+  # Flutter plugins can be installed with a build-tree rpath (media_kit's video
+  # plugin points at the CI workspace), and an object's own RUNPATH is used
+  # instead of the executable's rpath. Repoint any such stale rpath at the
+  # bundle's own lib dir, or the plugin never finds the bundled libmpv.
+  for f in "$libdir"/*.so*; do
+    rp="$(patchelf --print-rpath "$f" 2>/dev/null || true)"
+    case "$rp" in
+      *"$OUT"*) patchelf --set-rpath '$ORIGIN' "$f" ;;
+    esac
+  done
   echo "--- bundled media libs:"
-  ls "$libdir" | grep -E '^lib(mpv|av|sw|ass|placebo)' || true
+  ls "$libdir" | grep -E '^lib(mpv|av|sw|ass|placebo|uchardet|luajit)' || true
 fi
