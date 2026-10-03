@@ -148,18 +148,33 @@ jobs:
         if: steps.gate.outputs.publish == 'true'
         env:
           YURIREADER_FLATPAK_GPG_PRIVATE_KEY: ${{ secrets.YURIREADER_FLATPAK_GPG_PRIVATE_KEY }}
+          YURIREADER_FLATPAK_GPG_PASSPHRASE: ${{ secrets.YURIREADER_FLATPAK_GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
           test -n "$YURIREADER_FLATPAK_GPG_PRIVATE_KEY"
+          test -n "$YURIREADER_FLATPAK_GPG_PASSPHRASE"
           export GNUPGHOME="$RUNNER_TEMP/flatpak-gnupg"
           mkdir -m 700 "$GNUPGHOME"
           printf '%s\n' 'pinentry-mode loopback' > "$GNUPGHOME/gpg.conf"
-          printf '%s\n' 'allow-loopback-pinentry' > "$GNUPGHOME/gpg-agent.conf"
+          printf '%s\n' 'allow-loopback-pinentry' 'allow-preset-passphrase' \
+            > "$GNUPGHOME/gpg-agent.conf"
           gpgconf --kill gpg-agent || true
           printf '%s\n' "$YURIREADER_FLATPAK_GPG_PRIVATE_KEY" | gpg --batch --import
           key_id="$(gpg --batch --with-colons --list-secret-keys \
             | awk -F: '$1 == "fpr" { print $10; exit }')"
           test -n "$key_id"
+          # Cache the passphrase in the agent: flatpak-builder signs through
+          # gpg with no tty, so a protected key needs the passphrase preset.
+          keygrip="$(gpg --batch --with-colons --with-keygrip --list-secret-keys \
+            | awk -F: '$1 == "grp" { print $10; exit }')"
+          test -n "$keygrip"
+          preset="$(command -v gpg-preset-passphrase || true)"
+          [ -n "$preset" ] || preset="$(ls /usr/lib/gnupg/gpg-preset-passphrase \
+            /usr/libexec/gpg-preset-passphrase 2>/dev/null | head -1)"
+          test -n "$preset"
+          gpg-connect-agent reloadagent /bye
+          printf '%s' "$YURIREADER_FLATPAK_GPG_PASSPHRASE" \
+            | "$preset" --preset "$keygrip"
           echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
           echo "FLATPAK_GPG_KEY_ID=$key_id" >> "$GITHUB_ENV"
 
