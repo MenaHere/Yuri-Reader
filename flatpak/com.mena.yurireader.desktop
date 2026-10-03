@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=YuriReader
+Icon=com.mena.yurireader
+Exec=yurireader
+Categories=AudioVideo;
+Keywords=Manga;Anime;BitTorrent;
+StartupNotify=true
+Comment=Read manga, light novels and watch anime
+StartupWMClass=YuriReader

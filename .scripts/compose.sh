@@ -54,20 +54,22 @@ find "$OUT" -type f \
   ! -path "$OUT/macos/*" \
   -print0 | xargs -0 sed -i \
     -e 's/rust_lib_mangayomi/rust_lib_yuri_reader/g' \
-    -e 's/com\.kodjodevf\.mangayomi/com.kodjodevf.yurireader/g' \
+    -e 's/com\.kodjodevf\.mangayomi/com.mena.yurireader/g' \
     -e 's/mangayomi_rust/yuri_reader_rust/g' \
     -e 's/mangayomi/yurireader/g' \
     -e 's/Mangayomi/YuriReader/g'
 
 # ios/macos display-name files (the fork renamed these, kept the rest as-is)
-sed -i -e 's/mangayomi/yurireader/g' -e 's/Mangayomi/YuriReader/g' \
+sed -i -e 's/com\.kodjodevf\.mangayomi/com.mena.yurireader/g' \
+  -e 's/mangayomi/yurireader/g' -e 's/Mangayomi/YuriReader/g' \
   "$OUT/ios/Runner/Info.plist" \
   "$OUT/macos/Runner/Configs/AppInfo.xcconfig" \
   "$OUT/macos/Runner/Info.plist"
 
 # --- directory / file renames ----------------------------------------------
+mkdir -p "$OUT/android/app/src/main/kotlin/com/mena"
 mv "$OUT/android/app/src/main/kotlin/com/kodjodevf/mangayomi" \
-   "$OUT/android/app/src/main/kotlin/com/kodjodevf/yurireader"
+   "$OUT/android/app/src/main/kotlin/com/mena/yurireader"
 mv "$OUT/linux/mangayomi.desktop" "$OUT/linux/yurireader.desktop"
 mv "$OUT/rust_builder/ios/rust_lib_mangayomi.podspec" \
    "$OUT/rust_builder/ios/rust_lib_yuri_reader.podspec"

@@ -25,9 +25,10 @@ echo "--- dist/binaries after pkg:"
 ls -la "$ROOT/ts/dist/binaries/" 2>&1 || true
 
 case "$PLATFORM" in
-  linux)   PKG_GLOB="*linux" ;;
-  windows) PKG_GLOB="*win*" ;;
-  macos)   PKG_GLOB="*macos*" ;;
+  linux)   PKG_GLOB="*linux"   ; FLUTTER_TARGET="linux" ;;
+  windows) PKG_GLOB="*win*"    ; FLUTTER_TARGET="windows" ;;
+  macos)   PKG_GLOB="*macos*"  ; FLUTTER_TARGET="macos" ;;
+  android) PKG_GLOB="*linux"   ; FLUTTER_TARGET="apk" ;;
   *) echo "error: unsupported platform: $PLATFORM" >&2; exit 1 ;;
 esac
 
@@ -45,4 +46,7 @@ echo "=== [5/5] flutter build ==="
 cd "$OUT"
 flutter pub get
 dart pub get --directory=rust_builder/cargokit/build_tool
-flutter build "$PLATFORM" --release
+# Regenerate the platform launcher icons from the fork's master PNG
+# (assets/app_icons/icon.png) so every build carries the current icon.
+dart run flutter_launcher_icons
+flutter build "$FLUTTER_TARGET" --release

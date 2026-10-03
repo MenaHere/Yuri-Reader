@@ -1,0 +1,43 @@
+id: com.mena.yurireader
+runtime: org.gnome.Platform
+runtime-version: "51"
+sdk: org.gnome.Sdk
+command: yurireader
+separate-locales: false
+build-options:
+  no-debuginfo: true
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # The local-library feature reads and writes folders the user chooses, so the
+  # home filesystem is the smallest grant that keeps that core feature working.
+  - --filesystem=home
+modules:
+  - name: yurireader
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 apply_extra.sh /app/bin/apply_extra
+      - install -Dm755 yurireader-wrapper /app/bin/yurireader
+      - install -Dm644 com.mena.yurireader.desktop /app/share/applications/com.mena.yurireader.desktop
+      - install -Dm644 com.mena.yurireader.metainfo.xml /app/share/metainfo/com.mena.yurireader.metainfo.xml
+      - install -Dm644 com.mena.yurireader.svg /app/share/icons/hicolor/scalable/apps/com.mena.yurireader.svg
+    sources:
+      - type: extra-data
+        filename: yuri-reader-linux.tar.gz
+        only-arches:
+          - x86_64
+        url: https://github.com/MenaHere/Yuri-Reader/releases/download/v@VERSION@/yuri-reader-linux.tar.gz
+        sha256: @SHA256@
+        size: @SIZE@
+      - type: file
+        path: apply_extra.sh
+      - type: file
+        path: yurireader-wrapper
+      - type: file
+        path: com.mena.yurireader.desktop
+      - type: file
+        path: com.mena.yurireader.metainfo.xml
+      - type: file
+        path: com.mena.yurireader.svg

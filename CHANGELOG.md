@@ -1,5 +1,26 @@
 # Yuri-Reader - Change Log
 
+## Version 0.7.0
+
+### [2026-10-03]
+
+#### Added
+- A new app icon: the katakana ユ in orange on cream, replacing the mangayomi
+  icon on Android, Linux and the Flatpak. The Linux `.desktop` now resolves its
+  icon (it asked for `yurireader` while the shipped files were `mangayomi`)
+- A signed Android release: `android.yml` builds the release APK and attaches
+  it to the release (needs the keystore secrets)
+- A Flatpak remote: a signed GitHub Pages repository (`yurireader.flatpakrepo`)
+  built from the Linux bundle with static deltas, drag-exif style
+
+#### Changed
+- The app id is now `com.mena.yurireader` (was `com.kodjodevf.yurireader`), so
+  the Android application id, the Linux app id, the Kotlin package and the
+  on-disk data path all move under `com.mena` - existing installs start fresh
+- Releases are changelog-driven: a commit lands under `## Unreleased` and does
+  not release; renaming that section to a version (and bumping `pubspec.yaml`)
+  is what creates the release
+
 ## Version 0.6.9
 
 ### [2026-10-03]

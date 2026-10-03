@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Yuri-Reader">
+  <title>Yuri-Reader</title>
+  <!-- White rounded-square app icon with the katakana ユ (yu) -->
+  <rect x="0" y="0" width="512" height="512" rx="116" ry="116" fill="#ffffe5"/>
+  <g fill="none" stroke="#ff8c00" stroke-width="46"
+     stroke-linecap="round" stroke-linejoin="round">
+    <!-- ユ: a rising top stroke, a diagonal down-left turn, and a long
+         slightly bowed baseline. -->
+    <path d="M145 170 L351 154 L265 330"/>
+    <path d="M55 360 Q250 322 455 345"/>
+  </g>
+</svg>

@@ -543,7 +543,7 @@ class _DownloadFileScreenState extends ConsumerState<DownloadFileScreen> {
 }
 
 class ApkInstaller {
-  static const _platform = MethodChannel('com.kodjodevf.mangayomi.apk_install');
+  static const _platform = MethodChannel('com.mena.yurireader.apk_install');
   static Future<void> installApk(String filePath) async {
     try {
       await _platform.invokeMethod('installApk', {'filePath': filePath});

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.mena.yurireader</id>
+  <name>YuriReader</name>
+  <summary>Read manga, light novels and watch anime</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <description>
+    <p>
+      YuriReader is a free and open source manga reader and anime streaming
+      app, a fork of mangayomi with a MAL-Sync tracker bridge.
+    </p>
+  </description>
+  <launchable type="desktop-id">com.mena.yurireader.desktop</launchable>
+  <url type="homepage">https://github.com/MenaHere/Yuri-Reader</url>
+  <url type="bugtracker">https://github.com/MenaHere/Yuri-Reader/issues</url>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="@VERSION@" date="@DATE@"/>
+  </releases>
+</component>

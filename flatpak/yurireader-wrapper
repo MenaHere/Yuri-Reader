@@ -1,0 +1,4 @@
+#!/bin/sh
+# Launches the app unpacked from the extra-data by apply_extra.sh.
+set -eu
+exec /app/extra/bundle/yurireader "$@"
