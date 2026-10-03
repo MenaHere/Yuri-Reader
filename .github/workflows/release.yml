@@ -75,6 +75,7 @@ concurrency:
 
 jobs:
   gate:
+    name: "gate in[linux=${{ inputs.linux }} android=${{ inputs.android }} flatpak=${{ inputs.flatpak }} force=${{ inputs.force }}]"
     runs-on: ubuntu-latest
     outputs:
       publish: ${{ steps.check.outputs.publish }}
@@ -256,6 +257,7 @@ jobs:
           path: yuri-reader-*.apk
 
   release:
+    name: "release out[linux=${{ needs.gate.outputs.linux }} android=${{ needs.gate.outputs.android }} flatpak=${{ needs.gate.outputs.flatpak }} publish=${{ needs.gate.outputs.publish }}]"
     needs: [gate, build-linux, build-android]
     # A status check is needed so an unselected platform (skipped build) does
     # not skip the release; !failure() so a failed build still blocks it.
@@ -323,6 +325,7 @@ jobs:
           done
 
   flatpak:
+    name: "flatpak out=${{ needs.gate.outputs.flatpak }} publish=${{ needs.gate.outputs.publish }}"
     needs: [gate, release]
     if: needs.gate.outputs.publish == 'true' && needs.gate.outputs.flatpak == 'true'
     runs-on: ubuntu-latest
