@@ -80,6 +80,9 @@ jobs:
       publish: ${{ steps.check.outputs.publish }}
       version: ${{ steps.check.outputs.version }}
       replace: ${{ steps.check.outputs.replace }}
+      linux: ${{ steps.check.outputs.linux }}
+      android: ${{ steps.check.outputs.android }}
+      flatpak: ${{ steps.check.outputs.flatpak }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -105,13 +108,22 @@ jobs:
           else
             version="$(sed -n 's/^version: //p' dart/pubspec.yaml)"
           fi
-          echo "publish=$publish" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "replace=${{ inputs.replace }}" >> "$GITHUB_OUTPUT"
+          # Normalize the platform flags to literal true/false strings: an
+          # absent input (push, or release.yml dispatched by hand) means
+          # "selected"; only an explicit false means "not selected".
+          norm() { if [ "$1" = "false" ]; then echo false; else echo true; fi; }
+          {
+            echo "publish=$publish"
+            echo "version=$version"
+            echo "replace=${{ inputs.replace }}"
+            echo "linux=$(norm '${{ inputs.linux }}')"
+            echo "android=$(norm '${{ inputs.android }}')"
+            echo "flatpak=$(norm '${{ inputs.flatpak }}')"
+          } >> "$GITHUB_OUTPUT"
 
   build-linux:
     needs: gate
-    if: needs.gate.outputs.publish == 'true' && inputs.linux != false
+    if: needs.gate.outputs.publish == 'true' && needs.gate.outputs.linux == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -174,7 +186,7 @@ jobs:
 
   build-android:
     needs: gate
-    if: needs.gate.outputs.publish == 'true' && inputs.android != false
+    if: needs.gate.outputs.publish == 'true' && needs.gate.outputs.android == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -312,7 +324,7 @@ jobs:
 
   flatpak:
     needs: [gate, release]
-    if: needs.gate.outputs.publish == 'true' && inputs.flatpak != false
+    if: needs.gate.outputs.publish == 'true' && needs.gate.outputs.flatpak == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
