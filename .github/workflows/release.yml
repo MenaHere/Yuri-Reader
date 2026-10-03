@@ -43,6 +43,10 @@ on:
         description: Replace existing release assets instead of adding only missing ones
         type: boolean
         default: false
+      force:
+        description: Build even when the changelog's newest section is Unreleased (used by the manual pack)
+        type: boolean
+        default: false
     secrets:
       # A caller passes these with `secrets: inherit`. They are optional so a
       # Linux-only pack needs neither the keystore nor the Flatpak key.
@@ -86,17 +90,18 @@ jobs:
         id: check
         run: |
           set -euo pipefail
-          if [ -n "${{ inputs.version }}" ]; then
-            # A named version is an explicit pack request: publish it.
-            version="${{ inputs.version }}"
+          if [ "${{ inputs.force }}" = "true" ]; then
+            # A manual pack always builds, whatever the changelog says.
             publish=true
+          elif [ "$(grep -m1 '^## ' CHANGELOG.md)" = "## Unreleased" ]; then
+            publish=false
+          else
+            publish=true
+          fi
+          if [ -n "${{ inputs.version }}" ]; then
+            version="${{ inputs.version }}"
           else
             version="$(sed -n 's/^version: //p' dart/pubspec.yaml)"
-            if [ "$(grep -m1 '^## ' CHANGELOG.md)" = "## Unreleased" ]; then
-              publish=false
-            else
-              publish=true
-            fi
           fi
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"

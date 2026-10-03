@@ -50,3 +50,4 @@ jobs:
       version: ${{ inputs.version }}
       ref: ${{ inputs.ref }}
       replace: ${{ inputs.replace }}
+      force: true
