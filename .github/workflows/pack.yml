@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 name: pack
+# Surface the ticked boxes in the run's title so a skipped platform is visible
+# without opening the (admin-only) job logs.
+run-name: "pack linux=${{ inputs.linux }} android=${{ inputs.android }} flatpak=${{ inputs.flatpak }} replace=${{ inputs.replace }} version=${{ inputs.version }}"
 
 # Manual re-pack. Tick only the platforms you want, so a Linux re-pack does not
 # wait on the ~30-minute Android build. "version" publishes under that release
