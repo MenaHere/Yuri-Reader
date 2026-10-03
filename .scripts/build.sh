@@ -105,8 +105,6 @@ if [ "$PLATFORM" = "linux" ]; then
       libharfbuzz*|libfontconfig*|libfreetype*|libfribidi*|libexpat*) return 0 ;;
       libwayland*|libX*|libxcb*|libxkbcommon*|libgbm*|libdrm*|libepoxy*|libEGL*|libGL*|libvulkan*|libva*|libvdpau*) return 0 ;;
       libpulse*|libasound*|libpipewire*|libsndfile*) return 0 ;;
-      libjpeg*|libpng*|libtiff*|libwebp*|libgif*) return 0 ;;
-      libz.so*|liblzma*|libbz2*|libzstd*|libbrotli*|liblz4*) return 0 ;;
       libdbus-1*|libsystemd*|libselinux*|libmount*|libblkid*|libuuid*) return 0 ;;
       libffi*|libpcre*|libgcrypt*|libgpg-error*|libcrypto*|libssl*|libcurl*|libnghttp2*) return 0 ;;
       libsqlite3*|libxml2*|libicu*|liborc*|libgudev*|libudev*) return 0 ;;
