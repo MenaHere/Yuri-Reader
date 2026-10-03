@@ -181,8 +181,8 @@ jobs:
             2>/dev/null | head -1)" .key)"
           test -n "$keygrip"
           preset="$(command -v gpg-preset-passphrase || true)"
-          [ -n "$preset" ] || preset="$(ls /usr/lib/gnupg/gpg-preset-passphrase \
-            /usr/libexec/gpg-preset-passphrase 2>/dev/null | head -1)"
+          [ -n "$preset" ] || preset="$(find /usr/lib/gnupg /usr/libexec /usr/lib \
+            -name gpg-preset-passphrase -type f 2>/dev/null | head -1)"
           test -n "$preset"
           gpg-connect-agent reloadagent /bye
           printf '%s' "$YURIREADER_FLATPAK_GPG_PASSPHRASE" \
