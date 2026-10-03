@@ -84,8 +84,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # A manual pack may name the version to rebuild; that checks out its tag.
           ref: ${{ inputs.ref || github.ref }}
+      - name: Show the requested platforms
+        run: |
+          echo "linux=${{ inputs.linux }} android=${{ inputs.android }} flatpak=${{ inputs.flatpak }} version='${{ inputs.version }}' ref='${{ inputs.ref }}' replace=${{ inputs.replace }} force=${{ inputs.force }}"
       - name: Decide whether to publish
         id: check
         run: |
