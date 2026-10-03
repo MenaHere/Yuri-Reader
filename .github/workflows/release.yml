@@ -5,6 +5,9 @@ name: release
 # (after a sync). A release is created/updated only when the changelog's newest
 # section is a released `## Version X.Y.Z`; while it is `## Unreleased`, the
 # gate job reports publish=false and nothing is built or released.
+#
+# build-linux and build-android run in parallel; the release job waits for both,
+# attaches their assets, then builds and deploys the Flatpak.
 
 on:
   push:
@@ -42,12 +45,10 @@ jobs:
             echo "publish=true" >> "$GITHUB_OUTPUT"
           fi
 
-  release:
+  build-linux:
     needs: gate
     if: needs.gate.outputs.publish == 'true'
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -89,12 +90,6 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
       - name: Compose
         run: ./.scripts/compose.sh
 
@@ -105,6 +100,61 @@ jobs:
         run: |
           cd .build/app/build/linux/x64/release
           tar czf "$GITHUB_WORKSPACE/yuri-reader-linux.tar.gz" bundle/
+
+      - name: Upload the Linux bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-bundle
+          path: yuri-reader-linux.tar.gz
+
+  build-android:
+    needs: gate
+    if: needs.gate.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Node 24 (pkg)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - name: Cache pkg binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.pkg-cache
+          key: pkg-cache-node22-${{ runner.os }}
+
+      - name: Pre-fetch pkg base binaries
+        run: |
+          # pkg's own undici fetch silently fails on GitHub runners; curl works.
+          mkdir -p ~/.pkg-cache/v3.6
+          for t in linux-x64 win-x64 macos-x64; do
+            f=~/.pkg-cache/v3.6/fetched-v22.23.2-$t
+            [ -f "$f" ] || curl -fsSL --retry 3 "https://github.com/yao-pkg/pkg-fetch/releases/download/v3.6/node-v22.23.2-$t" -o "$f"
+            chmod +x "$f"
+          done
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Compose
+        run: ./.scripts/compose.sh
 
       - name: Build the signed APK
         env:
@@ -120,6 +170,34 @@ jobs:
           VERSION="$(grep '^version:' dart/pubspec.yaml | cut -d' ' -f2)"
           cp .build/app/build/app/outputs/flutter-apk/app-release.apk \
              "yuri-reader-${VERSION}.apk"
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: yuri-reader-*.apk
+
+  release:
+    needs: [gate, build-linux, build-android]
+    if: needs.gate.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download the Linux bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-bundle
+
+      - name: Download the APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
 
       - name: Create or update the release
         env:
@@ -192,7 +270,7 @@ jobs:
           echo "FLATPAK_GPG_KEY_ID=$key_id" >> "$GITHUB_ENV"
 
       - name: Resolve the release asset
-        id: release
+        id: asset
         run: |
           set -euo pipefail
           version="$(sed -n 's/^version: //p' dart/pubspec.yaml)"
@@ -212,10 +290,10 @@ jobs:
 
       - name: Generate the Flatpak manifest and metainfo
         env:
-          VERSION: ${{ steps.release.outputs.version }}
-          SHA256: ${{ steps.release.outputs.sha256 }}
-          SIZE: ${{ steps.release.outputs.size }}
-          RELEASE_DATE: ${{ steps.release.outputs.date }}
+          VERSION: ${{ steps.asset.outputs.version }}
+          SHA256: ${{ steps.asset.outputs.sha256 }}
+          SIZE: ${{ steps.asset.outputs.size }}
+          RELEASE_DATE: ${{ steps.asset.outputs.date }}
         run: |
           set -euo pipefail
           sed -e "s/@VERSION@/$VERSION/g" -e "s/@SHA256@/$SHA256/g" \
