@@ -190,3 +190,4 @@ jobs:
     needs: sync
     if: success()
     uses: ./.github/workflows/release.yml
+    secrets: inherit

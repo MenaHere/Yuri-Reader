@@ -18,6 +18,46 @@ on:
       - 'README.md'
       - '.package/README.md'
   workflow_call:
+    inputs:
+      linux:
+        description: Build the Linux bundle
+        type: boolean
+        default: true
+      android:
+        description: Build the signed Android APK
+        type: boolean
+        default: true
+      flatpak:
+        description: Rebuild and publish the Flatpak remote
+        type: boolean
+        default: true
+      version:
+        description: Release version to publish (e.g. 0.7.1); overrides the built version and bypasses the changelog gate
+        type: string
+        default: ''
+      ref:
+        description: Git ref to build from (defaults to the ref that triggered the run)
+        type: string
+        default: ''
+      replace:
+        description: Replace existing release assets instead of adding only missing ones
+        type: boolean
+        default: false
+    secrets:
+      # A caller passes these with `secrets: inherit`. They are optional so a
+      # Linux-only pack needs neither the keystore nor the Flatpak key.
+      ANDROID_KEYSTORE_BASE64:
+        required: false
+      ANDROID_KEYSTORE_PASSWORD:
+        required: false
+      ANDROID_KEY_ALIAS:
+        required: false
+      ANDROID_KEY_PASSWORD:
+        required: false
+      YURIREADER_FLATPAK_GPG_PRIVATE_KEY:
+        required: false
+      YURIREADER_FLATPAK_GPG_PASSPHRASE:
+        required: false
   workflow_dispatch:
 
 permissions:
@@ -34,22 +74,37 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       publish: ${{ steps.check.outputs.publish }}
+      version: ${{ steps.check.outputs.version }}
+      replace: ${{ steps.check.outputs.replace }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # A manual pack may name the version to rebuild; that checks out its tag.
+          ref: ${{ inputs.ref || github.ref }}
       - name: Decide whether to publish
         id: check
         run: |
-          TOP="$(grep -m1 '^## ' CHANGELOG.md)"
-          if [ "$TOP" = "## Unreleased" ]; then
-            echo "publish=false" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          if [ -n "${{ inputs.version }}" ]; then
+            # A named version is an explicit pack request: publish it.
+            version="${{ inputs.version }}"
+            publish=true
           else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
+            version="$(sed -n 's/^version: //p' dart/pubspec.yaml)"
+            if [ "$(grep -m1 '^## ' CHANGELOG.md)" = "## Unreleased" ]; then
+              publish=false
+            else
+              publish=true
+            fi
           fi
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "replace=${{ inputs.replace }}" >> "$GITHUB_OUTPUT"
 
   build-linux:
     needs: gate
-    if: needs.gate.outputs.publish == 'true'
+    if: needs.gate.outputs.publish == 'true' && inputs.linux != false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -57,6 +112,7 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Setup Node 24 (pkg)
         uses: actions/setup-node@v4
@@ -111,7 +167,7 @@ jobs:
 
   build-android:
     needs: gate
-    if: needs.gate.outputs.publish == 'true'
+    if: needs.gate.outputs.publish == 'true' && inputs.android != false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -119,6 +175,7 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Setup Node 24 (pkg)
         uses: actions/setup-node@v4
@@ -181,7 +238,74 @@ jobs:
 
   release:
     needs: [gate, build-linux, build-android]
-    if: needs.gate.outputs.publish == 'true'
+    # A status check is needed so an unselected platform (skipped build) does
+    # not skip the release; !failure() so a failed build still blocks it.
+    if: ${{ !cancelled() && !failure() && needs.gate.outputs.publish == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Download the Linux bundle
+        if: needs.build-linux.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-bundle
+
+      - name: Download the APK
+        if: needs.build-android.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+
+      - name: Name the APK after the release version
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.gate.outputs.version }}"
+          for f in yuri-reader-*.apk; do
+            [ -e "$f" ] || continue
+            [ "$f" = "yuri-reader-${VERSION}.apk" ] || mv "$f" "yuri-reader-${VERSION}.apk"
+          done
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPLACE: ${{ needs.gate.outputs.replace }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.gate.outputs.version }}"
+          TAG="v${VERSION}"
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Yuri-Reader $TAG" \
+              --notes "Built from $(git rev-parse --short HEAD)"
+          fi
+          # Upload only the assets this run built. A normal run adds only the
+          # ones the release is missing; a pack with replace=true overwrites.
+          assets=()
+          [ -f yuri-reader-linux.tar.gz ] && assets+=(yuri-reader-linux.tar.gz)
+          [ -f "yuri-reader-${VERSION}.apk" ] && assets+=("yuri-reader-${VERSION}.apk")
+          for asset in "${assets[@]}"; do
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+                 --json assets -q '.assets[].name' | grep -qx "$asset"; then
+              if [ "$REPLACE" = "true" ]; then
+                echo "replacing $asset on $TAG"
+                gh release upload "$TAG" "$asset" --repo "$GITHUB_REPOSITORY" --clobber
+              else
+                echo "$asset is already on $TAG - leaving it"
+              fi
+            else
+              gh release upload "$TAG" "$asset" --repo "$GITHUB_REPOSITORY"
+            fi
+          done
+
+  flatpak:
+    needs: [gate, release]
+    if: needs.gate.outputs.publish == 'true' && inputs.flatpak != false
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -190,40 +314,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Download the Linux bundle
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-bundle
-
-      - name: Download the APK
-        uses: actions/download-artifact@v4
-        with:
-          name: android-apk
-
-      - name: Create or update the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          VERSION="$(grep '^version:' dart/pubspec.yaml | cut -d' ' -f2)"
-          TAG="v${VERSION}"
-          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$TAG" \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "Yuri-Reader $TAG" \
-              --notes "Built from $(git rev-parse --short HEAD)"
-          fi
-          # Add only the assets the release is missing; never replace or remove
-          # an existing one (no --clobber).
-          for asset in yuri-reader-linux.tar.gz "yuri-reader-${VERSION}.apk"; do
-            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
-                 --json assets -q '.assets[].name' | grep -qx "$asset"; then
-              echo "$asset is already on $TAG - leaving it"
-            else
-              gh release upload "$TAG" "$asset" --repo "$GITHUB_REPOSITORY"
-            fi
-          done
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Install the Flatpak toolchain
         run: |
@@ -283,7 +374,7 @@ jobs:
         id: asset
         run: |
           set -euo pipefail
-          version="$(sed -n 's/^version: //p' dart/pubspec.yaml)"
+          version="${{ needs.gate.outputs.version }}"
           release="$(curl -fsSL "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/v${version}")"
           asset='yuri-reader-linux.tar.gz'
           url="$(jq -r --arg asset "$asset" \

@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: Apache-2.0
+name: pack
+
+# Manual re-pack. Tick only the platforms you want, so a Linux re-pack does not
+# wait on the ~30-minute Android build. "version" publishes under that release
+# version (default: the built version) and "replace" overwrites its existing
+# assets; "ref" builds an older tag when you need to. It calls the same reusable
+# release.yml the automatic release uses.
+on:
+  workflow_dispatch:
+    inputs:
+      linux:
+        description: Pack the Linux bundle
+        type: boolean
+        default: true
+      android:
+        description: Pack the signed Android APK (slow, ~30 min)
+        type: boolean
+        default: false
+      flatpak:
+        description: Rebuild and publish the Flatpak remote
+        type: boolean
+        default: false
+      version:
+        description: Release version to publish/replace (e.g. 0.7.1); empty = the built version
+        type: string
+        default: ''
+      ref:
+        description: Git ref to build from (empty = the branch this run starts from)
+        type: string
+        default: ''
+      replace:
+        description: Replace existing release assets instead of adding only missing ones
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  pack:
+    uses: ./.github/workflows/release.yml
+    secrets: inherit
+    with:
+      linux: ${{ inputs.linux }}
+      android: ${{ inputs.android }}
+      flatpak: ${{ inputs.flatpak }}
+      version: ${{ inputs.version }}
+      ref: ${{ inputs.ref }}
+      replace: ${{ inputs.replace }}
