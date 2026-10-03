@@ -2,7 +2,7 @@ name: yuri_reader
 description: Free and open source manga reader and anime streaming
   cross-plateform app inspired by Tachiyomi and Aniyomi.
 publish_to: "none"
-version: 0.6.8+1
+version: 0.6.9
 
 environment:
   sdk: ^3.13.5
@@ -191,9 +191,9 @@ inno_bundle:
   id: 6CB26FFA-E72B-42C3-91E8-594940031CA2
   publisher: kodjodevf
   name: YuriReader
-  url: https://github.com/kodjodevf/yuri_reader/
-  support_url: https://github.com/kodjodevf/yuri_reader/
-  updates_url: https://github.com/kodjodevf/yuri_reader/releases/
+  url: https://github.com/MenaHere/Yuri-Reader/
+  support_url: https://github.com/MenaHere/Yuri-Reader/
+  updates_url: https://github.com/MenaHere/Yuri-Reader/releases/
   languages:
     - english
     - french

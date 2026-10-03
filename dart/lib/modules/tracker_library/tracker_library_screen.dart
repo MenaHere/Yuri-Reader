@@ -1,5 +1,3 @@
-// ignore_for_file: use_build_context_synchronously
-
 import 'package:flutter/material.dart';
 import 'package:flutter_qjs/quickjs/ffi.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -234,12 +232,7 @@ class _TrackerLibraryScreenState extends ConsumerState<TrackerLibraryScreen> {
 
   List<TrackLibrarySection> _sectionsTrakt(int syncId, ItemType itemType) {
     return [
-      TrackLibrarySection(
-        name: "Continue watching movies",
-        syncId: syncId,
-        func: _fetchUserData(syncId, ItemType.manga),
-        itemType: ItemType.anime,
-      ),
+      // Prioritize Series (anime) sections
       TrackLibrarySection(
         name: "Continue watching series",
         syncId: syncId,
@@ -247,9 +240,22 @@ class _TrackerLibraryScreenState extends ConsumerState<TrackerLibraryScreen> {
         itemType: ItemType.anime,
       ),
       TrackLibrarySection(
-        name: "Trending Movies",
+        name: "Watchlist series",
         syncId: syncId,
-        func: _fetchGeneralData(syncId, ItemType.manga),
+        func: _fetchWatchlistData(syncId, ItemType.anime),
+        itemType: ItemType.anime,
+      ),
+      // Movies sections
+      TrackLibrarySection(
+        name: "Continue watching movies",
+        syncId: syncId,
+        func: _fetchUserData(syncId, ItemType.manga),
+        itemType: ItemType.anime,
+      ),
+      TrackLibrarySection(
+        name: "Watchlist movies",
+        syncId: syncId,
+        func: _fetchWatchlistData(syncId, ItemType.manga),
         itemType: ItemType.anime,
       ),
       TrackLibrarySection(
@@ -259,9 +265,9 @@ class _TrackerLibraryScreenState extends ConsumerState<TrackerLibraryScreen> {
         itemType: ItemType.anime,
       ),
       TrackLibrarySection(
-        name: "Popular Movies",
+        name: "Trending Movies",
         syncId: syncId,
-        func: _fetchGeneralData(syncId, ItemType.manga, rankingType: "popular"),
+        func: _fetchGeneralData(syncId, ItemType.manga),
         itemType: ItemType.anime,
       ),
       TrackLibrarySection(
@@ -271,13 +277,9 @@ class _TrackerLibraryScreenState extends ConsumerState<TrackerLibraryScreen> {
         itemType: ItemType.anime,
       ),
       TrackLibrarySection(
-        name: "Top Movies (All Time)",
+        name: "Popular Movies",
         syncId: syncId,
-        func: _fetchGeneralData(
-          syncId,
-          ItemType.manga,
-          rankingType: "favorited/all",
-        ),
+        func: _fetchGeneralData(syncId, ItemType.manga, rankingType: "popular"),
         itemType: ItemType.anime,
       ),
       TrackLibrarySection(
@@ -286,6 +288,16 @@ class _TrackerLibraryScreenState extends ConsumerState<TrackerLibraryScreen> {
         func: _fetchGeneralData(
           syncId,
           ItemType.anime,
+          rankingType: "favorited/all",
+        ),
+        itemType: ItemType.anime,
+      ),
+      TrackLibrarySection(
+        name: "Top Movies (All Time)",
+        syncId: syncId,
+        func: _fetchGeneralData(
+          syncId,
+          ItemType.manga,
           rankingType: "favorited/all",
         ),
         itemType: ItemType.anime,
@@ -492,6 +504,13 @@ class _TrackerLibraryScreenState extends ConsumerState<TrackerLibraryScreen> {
               func: _fetchUserData(syncId, ItemType.anime),
               itemType: ItemType.anime,
             ),
+            // Backlog: Plan to watch
+            TrackLibrarySection(
+              name: "Plan to watch",
+              syncId: syncId,
+              func: _fetchPlanningData(syncId, ItemType.anime),
+              itemType: ItemType.anime,
+            ),
             TrackLibrarySection(
               name: "Upcoming Anime",
               syncId: syncId,
@@ -535,6 +554,12 @@ class _TrackerLibraryScreenState extends ConsumerState<TrackerLibraryScreen> {
               name: "Continue reading",
               syncId: syncId,
               func: _fetchUserData(syncId, ItemType.manga),
+            ),
+            // Backlog: Plan to read
+            TrackLibrarySection(
+              name: "Plan to read",
+              syncId: syncId,
+              func: _fetchPlanningData(syncId, ItemType.manga),
             ),
             TrackLibrarySection(
               name: "Upcoming Manga",
@@ -617,6 +642,36 @@ class _TrackerLibraryScreenState extends ConsumerState<TrackerLibraryScreen> {
           ).notifier,
         )
         .fetchUserData();
+  }
+
+  Future<List<TrackSearch>?> Function() _fetchPlanningData(
+    int syncId,
+    ItemType itemType,
+  ) {
+    return () async => await ref
+        .read(
+          trackStateProvider(
+            track: Track(syncId: syncId, status: TrackStatus.completed),
+            itemType: itemType,
+            widgetRef: ref,
+          ).notifier,
+        )
+        .fetchPlanningData();
+  }
+
+  Future<List<TrackSearch>?> Function() _fetchWatchlistData(
+    int syncId,
+    ItemType itemType,
+  ) {
+    return () async => await ref
+        .read(
+          trackStateProvider(
+            track: Track(syncId: syncId, status: TrackStatus.completed),
+            itemType: itemType,
+            widgetRef: ref,
+          ).notifier,
+        )
+        .fetchWatchlistData();
   }
 
   void _openSwitchProviderDialog(AppLocalizations l10n) {

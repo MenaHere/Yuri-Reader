@@ -38,7 +38,7 @@ c = re.sub(r'^name: mangayomi$', 'name: yuri_reader', c, flags=re.M)
 c = re.sub(r'^version: .+$', f'version: {cur_ver}', c, flags=re.M)
 c = c.replace('rust_lib_mangayomi', 'rust_lib_yuri_reader')
 c = re.sub(r'^  name: Mangayomi$', '  name: YuriReader', c, flags=re.M)
-c = c.replace('https://github.com/kodjodevf/mangayomi/', 'https://github.com/kodjodevf/yuri_reader/')
+c = c.replace('https://github.com/kodjodevf/mangayomi/', 'https://github.com/MenaHere/Yuri-Reader/')
 
 # Re-add the yuri-sync asset (upstream has no such asset); keep the fork's
 # original position (between trackers_icons and app_icons) so the sync is

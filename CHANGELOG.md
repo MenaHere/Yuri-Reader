@@ -1,5 +1,22 @@
 # Yuri-Reader - Change Log
 
+## Version 0.6.9
+
+### [2026-10-03]
+
+#### Fixed
+- The Windows installer metadata pointed its URL, support URL and update URL at
+  `kodjodevf/yuri_reader` instead of the fork's own repository, so the update
+  check and the About links led to a repository that does not exist
+
+#### Changed
+- The reader's stale-page-list fix and the Linux WebP support were merged
+  upstream (PR #1031), so the fork dropped its own copies of those overlays and
+  now builds them from upstream. The overlays upstream moved under the same
+  bump (the reader, AniList, the tracker library and its state) were rebased
+  onto upstream, which also brings their newer fixes: AniList's outage
+  short-circuit and 429 retry, and the reader's remembered-page jump
+
 ## Version 0.6.8+1
 
 ### [2026-10-03]
