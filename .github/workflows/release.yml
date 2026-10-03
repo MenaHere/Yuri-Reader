@@ -212,8 +212,16 @@ jobs:
               --title "Yuri-Reader $TAG" \
               --notes "Built from $(git rev-parse --short HEAD)"
           fi
-          gh release upload "$TAG" yuri-reader-linux.tar.gz "yuri-reader-${VERSION}.apk" \
-            --repo "$GITHUB_REPOSITORY" --clobber
+          # Add only the assets the release is missing; never replace or remove
+          # an existing one (no --clobber).
+          for asset in yuri-reader-linux.tar.gz "yuri-reader-${VERSION}.apk"; do
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+                 --json assets -q '.assets[].name' | grep -qx "$asset"; then
+              echo "$asset is already on $TAG - leaving it"
+            else
+              gh release upload "$TAG" "$asset" --repo "$GITHUB_REPOSITORY"
+            fi
+          done
 
       - name: Install the Flatpak toolchain
         run: |
