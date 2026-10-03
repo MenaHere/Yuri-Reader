@@ -1,6 +1,6 @@
 name: upstream-sync
 
-# Weekend bot: tries to sync Yuri-Reader with upstream mangayomi + malsync,
+# Sync bot: tries to sync Yuri-Reader with upstream mangayomi + malsync,
 # builds Linux, and releases the bundle on success.
 # - No upstream updates (and not forced) -> run succeeds silently.
 # - Sync + build green -> BotYYYYMMDDnnn commit (submodule bumps + version
@@ -14,7 +14,7 @@ name: upstream-sync
 
 on:
   schedule:
-    - cron: '0 9 * * 0,6'   # Sat + Sun 09:00 UTC (17:00 +0800)
+    - cron: '0 0 * * 1,3,5'   # Mon + Wed + Fri 00:00 UTC (08:00 +0800)
   workflow_dispatch:
     inputs:
       force:
