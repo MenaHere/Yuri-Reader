@@ -1,5 +1,12 @@
 # Yuri-Reader - Change Log
 
+## Version 0.6.8+1
+
+### [2026-10-03]
+
+#### Bot
+- Synced 28 commits from [mangayomi](https://github.com/kodjodevf/mangayomi), 2 commits from [malsync](https://github.com/MALSync/MALSync)
+
 ## Version 0.6.8
 
 ### [2026-09-29]
