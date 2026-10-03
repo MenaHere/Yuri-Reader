@@ -1,5 +1,15 @@
 # Yuri-Reader - Change Log
 
+## Unreleased
+
+### [2026-10-03]
+
+#### Fixed
+- The Linux bundle and the Flatpak no longer bundle the host glib/GTK/Wayland
+  libraries, which shadowed the Flatpak runtime's newer ones and broke launch
+  with `undefined symbol: g_sort_array`; the media_kit video plugin's stale
+  build rpath is repointed too, so it finds the bundled libmpv
+
 ## Version 0.7.1
 
 ### [2026-10-03]
