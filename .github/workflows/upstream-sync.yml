@@ -1,13 +1,12 @@
 name: upstream-sync
 
-# Sync bot: tries to sync Yuri-Reader with upstream mangayomi + malsync,
-# builds Linux, and releases the bundle on success.
+# Sync bot: tries to sync Yuri-Reader with upstream mangayomi + malsync, then
+# hands the build and release to the reusable release workflow, which builds
+# every platform (Linux + Android + Flatpak) and releases all of them.
 # - No upstream updates (and not forced) -> run succeeds silently.
-# - Sync + build green -> BotYYYYMMDDnnn commit (submodule bumps + version
-#   bump + changelog entry) and a GitHub Release (tag v<version>).
-# - Releases are create-only: if the tag already has a release, the run refuses
-#   to rewrite it. A change that deserves a release gets a new version.
-# - Sync + build red -> the same commit without a version bump, the changelog
+# - Sync + analyze green -> BotYYYYMMDDnnn commit (submodule bumps + version
+#   bump + changelog entry) and the release workflow releases all platforms.
+# - Sync + analyze red -> the same commit without a version bump, the changelog
 #   entry marked `## Unreleased`, and no release. The sync still lands on main
 #   so the code can be fixed against the new upstream.
 # - Anything breaks -> run fails, which is the only notification you get.
@@ -30,7 +29,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-linux:
+  sync:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -79,38 +78,6 @@ jobs:
         if: steps.check.outputs.real == 'true'
         run: ./.scripts/sync-deps.sh
 
-      - name: Setup Node 18 (pkg)
-        if: steps.check.outputs.changed == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: ts/package-lock.json
-
-      - name: Cache pkg binaries
-        if: steps.check.outputs.changed == 'true'
-        uses: actions/cache@v4
-        with:
-          path: ~/.pkg-cache
-          key: pkg-cache-node22-${{ runner.os }}
-
-      - name: Pre-fetch pkg base binaries
-        if: steps.check.outputs.changed == 'true'
-        run: |
-          # pkg's own undici fetch silently fails on GitHub runners; curl works.
-          mkdir -p ~/.pkg-cache/v3.6
-          for t in linux-x64 win-x64 macos-x64; do
-            f=~/.pkg-cache/v3.6/fetched-v22.23.2-$t
-            [ -f "$f" ] || curl -fsSL --retry 3 "https://github.com/yao-pkg/pkg-fetch/releases/download/v3.6/node-v22.23.2-$t" -o "$f"
-            chmod +x "$f"
-          done
-
-      - name: Install Linux build deps
-        if: steps.check.outputs.changed == 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libasound2-dev libsoup-3.0-dev libmpv-dev libsecret-1-dev libwebp-dev
-
       - name: Install Flutter
         if: steps.check.outputs.changed == 'true'
         uses: subosito/flutter-action@v2
@@ -132,26 +99,20 @@ jobs:
         working-directory: .build/app
         run: dart pub get --directory=rust_builder/cargokit/build_tool
 
+      # The bot's gate: analyze errors only. A green analyze means the sync is
+      # released (version bump + release); a red one means the sync is committed
+      # as `## Unreleased` with no release. The heavy per-platform builds and
+      # the release itself are done by the reusable release workflow.
       - name: Flutter analyze
         if: steps.check.outputs.changed == 'true'
         working-directory: .build/app
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
-      - name: Compose + build Linux
-        if: steps.check.outputs.changed == 'true'
-        run: ./.scripts/build.sh linux
-
-      - name: Package Linux bundle
-        if: steps.check.outputs.changed == 'true'
-        run: |
-          cd .build/app/build/linux/x64/release
-          tar czf "$GITHUB_WORKSPACE/yuri-reader-linux.tar.gz" bundle/
-
-      # The sync is committed whether or not the build worked, so a failed sync
-      # still lands on main and the code can be fixed against the new upstream.
-      # The two changelog steps pick released vs unreleased with the step
-      # status functions, which are only valid in if: - success() means every
-      # earlier step passed, failure() means one of them did not.
+      # The sync is committed whether or not the analyze passed, so a failed
+      # sync still lands on main and the code can be fixed against the new
+      # upstream. The two changelog steps pick released vs unreleased with the
+      # step status functions, which are only valid in if: - success() means
+      # every earlier step passed, failure() means one of them did not.
       - name: Changelog (released)
         if: success() && steps.check.outputs.real == 'true'
         run: |
@@ -210,9 +171,9 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add dart/vendor/mangayomi ts/vendor/malsync dart/pubspec.yaml CHANGELOG.md
           SEQ=$(git log --format=%s --grep="^Bot$(date -u +%Y%m%d)" | wc -l)
-          # [skip ci]: this commit is already built here, and released here when
-          # green. Without it the push would build the same version a second
-          # time and replace the bot's release asset with its own build.
+          # [skip ci]: this commit is already built and released here by the
+          # release workflow. Without it the push would build the same version
+          # a second time and replace the bot's release asset with its own.
           TITLE="Bot$(date -u +%Y%m%d)$(printf '%03d' "$SEQ") [skip ci]"
           git commit -m "$TITLE" -m "Sync mangayomi @ ${{ steps.check.outputs.mangayomi }} + malsync @ ${{ steps.check.outputs.malsync }}" || echo "nothing to commit"
 
@@ -220,18 +181,9 @@ jobs:
         if: always() && steps.check.outputs.real == 'true'
         run: git push
 
-      - name: Create release
-        if: success() && steps.check.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION="$(grep '^version:' dart/pubspec.yaml | cut -d' ' -f2)"
-          TAG="v${VERSION}"
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "release $TAG already exists - refusing to rewrite it"
-            exit 0
-          fi
-          gh release create "$TAG" yuri-reader-linux.tar.gz \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Yuri-Reader $TAG" \
-            --notes "Sync mangayomi @ ${{ steps.check.outputs.mangayomi }} + malsync @ ${{ steps.check.outputs.malsync }}"
+  # Builds every platform and releases all of them. Runs only when the sync
+  # job succeeded (analyze green), so the changelog is a released version.
+  release:
+    needs: sync
+    if: success()
+    uses: ./.github/workflows/release.yml

@@ -12,6 +12,26 @@ OUT="$ROOT/.build/app"
 echo "=== [1/5] compose ==="
 "$ROOT/.scripts/compose.sh" "$OUT"
 
+# --- Android signing config (written after compose) -------------------
+# compose.sh wipes .build/app, so the keystore and key.properties must be
+# written after it. CI passes the secrets as env vars; a local build without
+# them produces an unsigned APK.
+if [ "$PLATFORM" = "android" ] && [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+  for n in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+    eval "v=\$$n"
+    [ -n "$v" ] || { echo "error: missing $n" >&2; exit 1; }
+  done
+  printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\n\r ' \
+    | base64 --decode --ignore-garbage > "$OUT/android/app/yurireader.jks"
+  test -s "$OUT/android/app/yurireader.jks"
+  cat > "$OUT/android/key.properties" <<EOF
+storePassword=$ANDROID_KEYSTORE_PASSWORD
+keyPassword=$ANDROID_KEY_PASSWORD
+keyAlias=$ANDROID_KEY_ALIAS
+storeFile=yurireader.jks
+EOF
+fi
+
 # --- yuri-sync binary (platform-specific, built from ts) -------------
 # The malsync submodule lives at ts/vendor/malsync, so its deps resolve
 # naturally from ts/node_modules - no root symlink needed.

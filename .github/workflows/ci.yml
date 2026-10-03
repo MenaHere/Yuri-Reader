@@ -1,11 +1,10 @@
 name: ci
 
-# Push-triggered build: verifies the composed app compiles on every human push
-# to main and attaches the Linux bundle to the release for the current version.
-# A release is created only when the changelog's newest section is a released
-# `## Version X.Y.Z` (a version bump); while it is `## Unreleased`, the run
-# builds but touches no release. Bot sync commits are skipped (see the job
-# condition below).
+# Pure CI: verifies the composed app compiles on every human push to main. It
+# never touches a release. When the changelog's newest section is a released
+# `## Version X.Y.Z` (a version bump), it calls the reusable release workflow,
+# which builds every platform and attaches all assets. Bot sync commits are
+# skipped (see the job condition below); upstream-sync does its own release.
 
 on:
   push:
@@ -23,13 +22,14 @@ concurrency:
 
 jobs:
   build-linux:
-    # Bot sync commits are already built here, and released when green, by
-    # upstream-sync, so rebuilding them would spend a second run and replace
-    # that release's asset with this build instead. The bot also puts GitHub's
-    # skip marker in its commit message, which stops this workflow from being
+    # Bot sync commits are built and released by upstream-sync, so rebuilding
+    # them here would spend a second run. The bot also puts GitHub's skip
+    # marker in its commit message, which stops this workflow from being
     # triggered at all; this check covers a bot commit pushed without it.
     if: github.event.head_commit.author.name != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.gate.outputs.publish }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,7 +37,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Setup Node 18 (pkg)
+      - name: Setup Node 24 (pkg)
         uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -77,54 +77,7 @@ jobs:
       - name: Build Linux
         run: ./.scripts/build.sh linux
 
-      - name: Package Linux bundle
-        run: |
-          cd .build/app/build/linux/x64/release
-          tar czf "$GITHUB_WORKSPACE/yuri-reader-linux.tar.gz" bundle/
-
-      - name: Create or update the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          VERSION="$(grep '^version:' dart/pubspec.yaml | cut -d' ' -f2)"
-          TAG="v${VERSION}"
-          TOP="$(grep -m1 '^## ' CHANGELOG.md)"
-          if [ "$TOP" = "## Unreleased" ]; then
-            echo "changelog is Unreleased - build only, no release"
-            exit 0
-          fi
-          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$TAG" \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "Yuri-Reader $TAG" \
-              --notes "Built from $(git rev-parse --short HEAD)"
-          fi
-          gh release upload "$TAG" yuri-reader-linux.tar.gz \
-            --repo "$GITHUB_REPOSITORY" --clobber
-
-  # Publishes the signed Flatpak remote on GitHub Pages, drag-exif style. It
-  # runs only for a released version (the changelog's newest section is not
-  # `## Unreleased`), after the Linux asset exists.
-  publish-flatpak:
-    needs: [build-linux]
-    if: github.event_name == 'push' && github.event.head_commit.author.name != 'github-actions[bot]'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-
-      - name: Decide whether to publish
+      - name: Decide whether this push releases
         id: gate
         run: |
           TOP="$(grep -m1 '^## ' CHANGELOG.md)"
@@ -134,144 +87,7 @@ jobs:
             echo "publish=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Install the Flatpak toolchain
-        if: steps.gate.outputs.publish == 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder jq ostree
-          flatpak remote-add --user --if-not-exists flathub \
-            https://dl.flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user -y --noninteractive flathub \
-            org.gnome.Platform//51 org.gnome.Sdk//51
-
-      - name: Import the repository signing key
-        if: steps.gate.outputs.publish == 'true'
-        env:
-          YURIREADER_FLATPAK_GPG_PRIVATE_KEY: ${{ secrets.YURIREADER_FLATPAK_GPG_PRIVATE_KEY }}
-          YURIREADER_FLATPAK_GPG_PASSPHRASE: ${{ secrets.YURIREADER_FLATPAK_GPG_PASSPHRASE }}
-        run: |
-          set -euo pipefail
-          missing=""
-          for n in YURIREADER_FLATPAK_GPG_PRIVATE_KEY YURIREADER_FLATPAK_GPG_PASSPHRASE; do
-            eval "v=\$$n"
-            [ -n "$v" ] || missing="$missing $n"
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::missing repository secrets:$missing"
-            exit 1
-          fi
-          export GNUPGHOME="$RUNNER_TEMP/flatpak-gnupg"
-          mkdir -m 700 "$GNUPGHOME"
-          printf '%s\n' 'pinentry-mode loopback' > "$GNUPGHOME/gpg.conf"
-          printf '%s\n' 'allow-loopback-pinentry' 'allow-preset-passphrase' \
-            > "$GNUPGHOME/gpg-agent.conf"
-          gpgconf --kill gpg-agent || true
-          # Capture the import output: it names the key id, and the keygrip is
-          # the filename gpg stores the secret key under. Both are read without
-          # a second gpg call, which is what kept failing on the runner.
-          import_out="$(printf '%s\n' "$YURIREADER_FLATPAK_GPG_PRIVATE_KEY" \
-            | gpg --batch --import 2>&1)"
-          key_id="$(printf '%s\n' "$import_out" \
-            | sed -n 's/^gpg: key \([0-9A-F]*\): secret key imported.*/\1/p' \
-            | head -1)"
-          test -n "$key_id"
-          # Cache the passphrase in the agent: flatpak-builder signs through
-          # gpg with no tty, so a protected key needs the passphrase preset.
-          keygrip="$(basename "$(ls "$GNUPGHOME"/private-keys-v1.d/*.key \
-            2>/dev/null | head -1)" .key)"
-          test -n "$keygrip"
-          preset="$(command -v gpg-preset-passphrase || true)"
-          [ -n "$preset" ] || preset="$(find /usr/lib/gnupg /usr/libexec /usr/lib \
-            -name gpg-preset-passphrase -type f 2>/dev/null | head -1)"
-          test -n "$preset"
-          gpg-connect-agent reloadagent /bye
-          printf '%s' "$YURIREADER_FLATPAK_GPG_PASSPHRASE" \
-            | "$preset" --preset "$keygrip"
-          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
-          echo "FLATPAK_GPG_KEY_ID=$key_id" >> "$GITHUB_ENV"
-
-      - name: Resolve the release asset
-        if: steps.gate.outputs.publish == 'true'
-        id: release
-        run: |
-          set -euo pipefail
-          version="$(sed -n 's/^version: //p' dart/pubspec.yaml)"
-          release="$(curl -fsSL "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/v${version}")"
-          asset='yuri-reader-linux.tar.gz'
-          url="$(jq -r --arg asset "$asset" \
-            '.assets[] | select(.name == $asset) | .browser_download_url' \
-            <<<"$release")"
-          test -n "$url" && test "$url" != null
-          archive="$RUNNER_TEMP/$asset"
-          curl -fsSL --retry 3 --retry-all-errors -o "$archive" "$url"
-          sha256="$(sha256sum "$archive" | cut -d' ' -f1)"
-          size="$(stat -c%s "$archive")"
-          date="$(jq -r '.published_at' <<<"$release" | cut -c1-10)"
-          printf 'version=%s\nsha256=%s\nsize=%s\ndate=%s\n' \
-            "$version" "$sha256" "$size" "$date" >> "$GITHUB_OUTPUT"
-
-      - name: Generate the Flatpak manifest and metainfo
-        if: steps.gate.outputs.publish == 'true'
-        env:
-          VERSION: ${{ steps.release.outputs.version }}
-          SHA256: ${{ steps.release.outputs.sha256 }}
-          SIZE: ${{ steps.release.outputs.size }}
-          RELEASE_DATE: ${{ steps.release.outputs.date }}
-        run: |
-          set -euo pipefail
-          sed -e "s/@VERSION@/$VERSION/g" -e "s/@SHA256@/$SHA256/g" \
-            -e "s/@SIZE@/$SIZE/g" \
-            flatpak/com.mena.yurireader.yml.in > flatpak/com.mena.yurireader.yml
-          sed -e "s/@VERSION@/$VERSION/g" -e "s/@DATE@/$RELEASE_DATE/g" \
-            flatpak/com.mena.yurireader.metainfo.xml.in \
-            > flatpak/com.mena.yurireader.metainfo.xml
-
-      - name: Build and sign the Flatpak repository
-        if: steps.gate.outputs.publish == 'true'
-        run: |
-          set -euo pipefail
-          repo="$RUNNER_TEMP/flatpak-repo"
-          build="$RUNNER_TEMP/flatpak-build"
-          flatpak-builder --force-clean --repo="$repo" --default-branch=stable \
-            --gpg-sign="$FLATPAK_GPG_KEY_ID" --gpg-homedir="$GNUPGHOME" \
-            --install-deps-from=flathub --user \
-            "$build" flatpak/com.mena.yurireader.yml
-          flatpak build-update-repo --gpg-sign="$FLATPAK_GPG_KEY_ID" \
-            --gpg-homedir="$GNUPGHOME" --generate-static-deltas "$repo"
-          echo "FLATPAK_REPO=$repo" >> "$GITHUB_ENV"
-
-      - name: Assemble the GitHub Pages site
-        if: steps.gate.outputs.publish == 'true'
-        run: |
-          set -euo pipefail
-          pages="$RUNNER_TEMP/pages"
-          mkdir -p "$pages/repo"
-          cp -a "$FLATPAK_REPO/." "$pages/repo/"
-          gpg --batch --armor --export "$FLATPAK_GPG_KEY_ID" > "$pages/yurireader.gpg"
-          gpg_key="$(base64 -w0 "$pages/yurireader.gpg")"
-          owner="${GITHUB_REPOSITORY_OWNER,,}"
-          repository="${GITHUB_REPOSITORY#*/}"
-          cat > "$pages/yurireader.flatpakrepo" <<EOF
-          [Flatpak Repo]
-          Title=YuriReader
-          Url=https://${owner}.github.io/${repository}/repo
-          Homepage=https://github.com/${GITHUB_REPOSITORY}
-          Comment=YuriReader Flatpak repository
-          Description=Signed Flatpak releases of YuriReader.
-          GPGKey=${gpg_key}
-          EOF
-
-      - name: Configure Pages
-        if: steps.gate.outputs.publish == 'true'
-        uses: actions/configure-pages@v5
-
-      - name: Upload the Pages artifact
-        if: steps.gate.outputs.publish == 'true'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ${{ runner.temp }}/pages
-
-      - name: Deploy GitHub Pages
-        if: steps.gate.outputs.publish == 'true'
-        id: deployment
-        uses: actions/deploy-pages@v4
+  release:
+    needs: build-linux
+    if: needs.build-linux.outputs.publish == 'true'
+    uses: ./.github/workflows/release.yml
