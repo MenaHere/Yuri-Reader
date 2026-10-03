@@ -151,8 +151,15 @@ jobs:
           YURIREADER_FLATPAK_GPG_PASSPHRASE: ${{ secrets.YURIREADER_FLATPAK_GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
-          test -n "$YURIREADER_FLATPAK_GPG_PRIVATE_KEY"
-          test -n "$YURIREADER_FLATPAK_GPG_PASSPHRASE"
+          missing=""
+          for n in YURIREADER_FLATPAK_GPG_PRIVATE_KEY YURIREADER_FLATPAK_GPG_PASSPHRASE; do
+            eval "v=\$$n"
+            [ -n "$v" ] || missing="$missing $n"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::missing repository secrets:$missing"
+            exit 1
+          fi
           export GNUPGHOME="$RUNNER_TEMP/flatpak-gnupg"
           mkdir -m 700 "$GNUPGHOME"
           printf '%s\n' 'pinentry-mode loopback' > "$GNUPGHOME/gpg.conf"
