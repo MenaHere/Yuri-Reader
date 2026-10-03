@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
 # Launches the app unpacked from the extra-data by apply_extra.sh.
 set -eu
 exec /app/extra/bundle/yurireader "$@"

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 name: upstream-sync
 
 # Sync bot: tries to sync Yuri-Reader with upstream mangayomi + malsync, then

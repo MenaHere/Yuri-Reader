@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
 # Unpacks the Yuri-Reader Linux bundle downloaded by the Flatpak extra-data.
 # Runs as root with all capabilities dropped, so it must not assume ownership.
 set -eu

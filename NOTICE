@@ -1,10 +1,13 @@
 Yuri-Reader - Third-party notices
 
-Yuri-Reader is a fork of mangayomi (Apache-2.0). The mangayomi-derived code
-and the fork's own code are licensed under the Apache License 2.0 (see
-LICENSE-APACHE), except for the GPL-3.0 components listed below, which are
-licensed under the GNU General Public License version 3 (see
-LICENSE-GPL-3.0).
+Yuri-Reader is a fork of mangayomi (Apache-2.0). Licensing is per component,
+not dual-licensed: each part carries exactly one license. The app-side code -
+the mangayomi-derived code and the fork's own `dart/` bridge, `.scripts/` build
+scripts, `.github/` workflows, and `.package/` packaging (including
+`.package/flatpak/`) - is licensed under the Apache License 2.0 (see
+LICENSE-APACHE). The sync-side components listed below are licensed under the
+GNU General Public License version 3 (see LICENSE-GPL-3.0). The two sides are
+separate programs that communicate only over localhost sockets.
 
 GPL-3.0 components:
 

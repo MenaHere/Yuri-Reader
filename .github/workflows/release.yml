@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 name: release
 
 # Builds every platform and attaches all assets to the release for the current
@@ -15,6 +16,7 @@ on:
     paths-ignore:
       - 'CHANGELOG.md'
       - 'README.md'
+      - '.package/README.md'
   workflow_call:
   workflow_dispatch:
 
