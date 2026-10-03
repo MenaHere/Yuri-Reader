@@ -89,7 +89,9 @@ jobs:
             echo "::error::missing repository secrets:$missing"
             exit 1
           fi
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > .build/app/android/app/yurireader.jks
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\n\r ' \
+            | base64 --decode --ignore-garbage > .build/app/android/app/yurireader.jks
+          test -s .build/app/android/app/yurireader.jks
           cat > .build/app/android/key.properties <<EOF
           storePassword=$ANDROID_KEYSTORE_PASSWORD
           keyPassword=$ANDROID_KEY_PASSWORD
