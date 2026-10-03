@@ -327,7 +327,11 @@ jobs:
   flatpak:
     name: "flatpak out=${{ needs.gate.outputs.flatpak }} publish=${{ needs.gate.outputs.publish }}"
     needs: [gate, release]
-    if: needs.gate.outputs.publish == 'true' && needs.gate.outputs.flatpak == 'true'
+    # A status function is required here: the platform builds upstream of
+    # `release` are skipped when unselected, and a skipped job propagates to
+    # every downstream job unless its `if` contains one. !failure() still blocks
+    # the Flatpak when a selected build actually fails.
+    if: ${{ !cancelled() && !failure() && needs.gate.outputs.publish == 'true' && needs.gate.outputs.flatpak == 'true' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
