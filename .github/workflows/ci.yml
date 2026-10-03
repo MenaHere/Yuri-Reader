@@ -1,10 +1,10 @@
 name: ci
 
-# Pure CI: verifies the composed app compiles on every human push to main. It
-# never touches a release. When the changelog's newest section is a released
-# `## Version X.Y.Z` (a version bump), it calls the reusable release workflow,
-# which builds every platform and attaches all assets. Bot sync commits are
-# skipped (see the job condition below); upstream-sync does its own release.
+# Pure CI: verifies the composed app analyzes cleanly on every human push to
+# main. It never builds and never touches a release. The release workflow
+# (release.yml) is triggered by the same push and does the build + release for
+# every platform, gated on the changelog. Bot sync commits are skipped (see the
+# job condition below); upstream-sync runs its own release.
 
 on:
   push:
@@ -14,58 +14,26 @@ on:
       - 'README.md'
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 concurrency:
   group: ci
   cancel-in-progress: true
 
 jobs:
-  build-linux:
-    # Bot sync commits are built and released by upstream-sync, so rebuilding
-    # them here would spend a second run. The bot also puts GitHub's skip
-    # marker in its commit message, which stops this workflow from being
-    # triggered at all; this check covers a bot commit pushed without it.
+  analyze:
+    # Bot sync commits are analyzed and released by upstream-sync, so running
+    # here would spend a second run. The bot also puts GitHub's skip marker in
+    # its commit message, which stops this workflow from being triggered at
+    # all; this check covers a bot commit pushed without it.
     if: github.event.head_commit.author.name != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    outputs:
-      publish: ${{ steps.gate.outputs.publish }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
-
-      - name: Setup Node 24 (pkg)
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: ts/package-lock.json
-
-      - name: Cache pkg binaries
-        uses: actions/cache@v4
-        with:
-          path: ~/.pkg-cache
-          key: pkg-cache-node22-${{ runner.os }}
-
-      - name: Pre-fetch pkg base binaries
-        run: |
-          # pkg's own undici fetch silently fails on GitHub runners; curl works.
-          mkdir -p ~/.pkg-cache/v3.6
-          for t in linux-x64 win-x64 macos-x64; do
-            f=~/.pkg-cache/v3.6/fetched-v22.23.2-$t
-            [ -f "$f" ] || curl -fsSL --retry 3 "https://github.com/yao-pkg/pkg-fetch/releases/download/v3.6/node-v22.23.2-$t" -o "$f"
-            chmod +x "$f"
-          done
-
-      - name: Install Linux build deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libasound2-dev libsoup-3.0-dev libmpv-dev libsecret-1-dev libwebp-dev
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2
@@ -76,20 +44,14 @@ jobs:
       - name: Compose
         run: ./.scripts/compose.sh
 
-      - name: Build Linux
-        run: ./.scripts/build.sh linux
+      - name: Flutter pub get
+        working-directory: .build/app
+        run: flutter pub get
 
-      - name: Decide whether this push releases
-        id: gate
-        run: |
-          TOP="$(grep -m1 '^## ' CHANGELOG.md)"
-          if [ "$TOP" = "## Unreleased" ]; then
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Cargokit pub get
+        working-directory: .build/app
+        run: dart pub get --directory=rust_builder/cargokit/build_tool
 
-  release:
-    needs: build-linux
-    if: needs.build-linux.outputs.publish == 'true'
-    uses: ./.github/workflows/release.yml
+      - name: Flutter analyze
+        working-directory: .build/app
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings

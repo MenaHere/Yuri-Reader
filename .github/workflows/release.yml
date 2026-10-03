@@ -1,21 +1,50 @@
 name: release
 
-# Reusable release workflow: builds every platform and attaches all assets to
-# the release for the current version. Called by ci.yml (on a human version
-# bump) and by upstream-sync.yml (after a sync). A release is created/updated
-# only when the changelog's newest section is a released `## Version X.Y.Z`;
-# while it is `## Unreleased`, the run builds but touches no release.
+# Builds every platform and attaches all assets to the release for the current
+# version. Triggers on a push to main and can also be called by upstream-sync.yml
+# (after a sync). A release is created/updated only when the changelog's newest
+# section is a released `## Version X.Y.Z`; while it is `## Unreleased`, the
+# gate job reports publish=false and nothing is built or released.
 
 on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'CHANGELOG.md'
+      - 'README.md'
   workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: write
   pages: write
   id-token: write
 
+concurrency:
+  group: release
+  cancel-in-progress: true
+
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.check.outputs.publish }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Decide whether to publish
+        id: check
+        run: |
+          TOP="$(grep -m1 '^## ' CHANGELOG.md)"
+          if [ "$TOP" = "## Unreleased" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
   release:
+    needs: gate
+    if: needs.gate.outputs.publish == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -92,18 +121,7 @@ jobs:
           cp .build/app/build/app/outputs/flutter-apk/app-release.apk \
              "yuri-reader-${VERSION}.apk"
 
-      - name: Decide whether to publish
-        id: gate
-        run: |
-          TOP="$(grep -m1 '^## ' CHANGELOG.md)"
-          if [ "$TOP" = "## Unreleased" ]; then
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Create or update the release
-        if: steps.gate.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -120,7 +138,6 @@ jobs:
             --repo "$GITHUB_REPOSITORY" --clobber
 
       - name: Install the Flatpak toolchain
-        if: steps.gate.outputs.publish == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y flatpak flatpak-builder jq ostree
@@ -130,7 +147,6 @@ jobs:
             org.gnome.Platform//51 org.gnome.Sdk//51
 
       - name: Import the repository signing key
-        if: steps.gate.outputs.publish == 'true'
         env:
           YURIREADER_FLATPAK_GPG_PRIVATE_KEY: ${{ secrets.YURIREADER_FLATPAK_GPG_PRIVATE_KEY }}
           YURIREADER_FLATPAK_GPG_PASSPHRASE: ${{ secrets.YURIREADER_FLATPAK_GPG_PASSPHRASE }}
@@ -176,7 +192,6 @@ jobs:
           echo "FLATPAK_GPG_KEY_ID=$key_id" >> "$GITHUB_ENV"
 
       - name: Resolve the release asset
-        if: steps.gate.outputs.publish == 'true'
         id: release
         run: |
           set -euo pipefail
@@ -196,7 +211,6 @@ jobs:
             "$version" "$sha256" "$size" "$date" >> "$GITHUB_OUTPUT"
 
       - name: Generate the Flatpak manifest and metainfo
-        if: steps.gate.outputs.publish == 'true'
         env:
           VERSION: ${{ steps.release.outputs.version }}
           SHA256: ${{ steps.release.outputs.sha256 }}
@@ -212,7 +226,6 @@ jobs:
             > .package/flatpak/com.mena.yurireader.metainfo.xml
 
       - name: Build and sign the Flatpak repository
-        if: steps.gate.outputs.publish == 'true'
         run: |
           set -euo pipefail
           repo="$RUNNER_TEMP/flatpak-repo"
@@ -226,7 +239,6 @@ jobs:
           echo "FLATPAK_REPO=$repo" >> "$GITHUB_ENV"
 
       - name: Assemble the GitHub Pages site
-        if: steps.gate.outputs.publish == 'true'
         run: |
           set -euo pipefail
           pages="$RUNNER_TEMP/pages"
@@ -247,16 +259,13 @@ jobs:
           EOF
 
       - name: Configure Pages
-        if: steps.gate.outputs.publish == 'true'
         uses: actions/configure-pages@v5
 
       - name: Upload the Pages artifact
-        if: steps.gate.outputs.publish == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: ${{ runner.temp }}/pages
 
       - name: Deploy GitHub Pages
-        if: steps.gate.outputs.publish == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
