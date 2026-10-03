@@ -70,3 +70,41 @@ dart pub get --directory=rust_builder/cargokit/build_tool
 # (assets/app_icons/icon.png) so every build carries the current icon.
 dart run flutter_launcher_icons
 flutter build "$FLUTTER_TARGET" --release
+
+# --- bundle libmpv and its codec stack (Linux only) -------------------------
+# media_kit links libmpv.so.2 at build time, but a raw Flutter bundle ships
+# only Flutter's own libraries. On any host without mpv installed - and in the
+# Flatpak runtime - the executable then dies at launch with
+# "libmpv.so.2: cannot open shared object file". Copy libmpv and its
+# shared-library closure into bundle/lib so the tar (and the Flatpak built
+# from it) is self-contained.
+if [ "$PLATFORM" = "linux" ]; then
+  bundle="$OUT/build/linux/x64/release/bundle"
+  libdir="$bundle/lib"
+  mpv="$(ldconfig -p | awk '/libmpv\.so\.2 /{print $NF; exit}')"
+  if [ -z "$mpv" ]; then
+    echo "error: libmpv.so.2 not found on the build host (install libmpv-dev)" >&2
+    exit 1
+  fi
+
+  copy_closure() {
+    local lib="$1" base dep
+    base="$(basename "$lib")"
+    if [ -e "$libdir/$base" ]; then return 0; fi
+    case "$base" in
+      libc.so*|libm.so*|libdl.so*|libpthread.so*|librt.so*|libgcc_s.so*|libstdc++.so*|ld-linux*) return 0 ;;
+    esac
+    cp -L "$lib" "$libdir/$base"
+    while read -r dep; do
+      case "$dep" in /*) copy_closure "$dep" ;; esac
+    done < <(ldd "$lib" 2>/dev/null | awk '/=> \//{print $3}')
+    return 0
+  }
+  copy_closure "$mpv"
+
+  # libmpv's own dependencies are transitive, and DT_RUNPATH is not inherited;
+  # force a DT_RPATH on the executable so the loader searches lib/ for them.
+  patchelf --force-rpath --set-rpath '$ORIGIN/lib' "$bundle/yurireader"
+  echo "--- bundled media libs:"
+  ls "$libdir" | grep -E '^lib(mpv|av|sw|ass|placebo)' || true
+fi

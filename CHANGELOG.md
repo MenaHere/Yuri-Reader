@@ -1,5 +1,19 @@
 # Yuri-Reader - Change Log
 
+## Unreleased
+
+### [2026-10-03]
+
+#### Fixed
+- The Linux bundle and the Flatpak now ship `libmpv.so.2` and its codec stack.
+  media_kit links libmpv at build time but a raw Flutter bundle omits it, so the
+  app died at launch with "libmpv.so.2: cannot open shared object file" on any
+  host without mpv installed
+
+#### Changed
+- The Flatpak remote file is `yurireader.flatpakrepo`; re-add the remote if you
+  added an earlier URL
+
 ## Version 0.7.0
 
 ### [2026-10-03]
