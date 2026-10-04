@@ -4,6 +4,11 @@
 
 ### [2026-10-03]
 
+#### Changed
+- The Flatpak now grants network and audio (`--share=network`,
+  `--socket=pulseaudio`), so online features, font downloads and sound work
+  instead of failing inside the sandbox
+
 #### Fixed
 - The Linux bundle and the Flatpak now carry every library the app needs that
   the Flatpak runtime lacks (libmpv, the codec stack, libjpeg, libXpresent,
