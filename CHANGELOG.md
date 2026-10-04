@@ -5,10 +5,12 @@
 ### [2026-10-03]
 
 #### Fixed
-- The Linux bundle and the Flatpak no longer bundle the host glib/GTK/Wayland
-  libraries, which shadowed the Flatpak runtime's newer ones and broke launch
-  with `undefined symbol: g_sort_array`; the media_kit video plugin's stale
-  build rpath is repointed too, so it finds the bundled libmpv
+- The Linux bundle and the Flatpak now carry every library the app needs that
+  the Flatpak runtime lacks (libmpv, the codec stack, libjpeg, libXpresent,
+  libxml2, ...) and none that it provides, so the app launches instead of dying
+  on a missing library. The runtime's own library list drives the bundling, so a
+  runtime update cannot leave a gap; the media_kit video plugin's stale build
+  rpath is repointed too, so it finds the bundled libmpv
 
 ## Version 0.7.1
 

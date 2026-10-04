@@ -160,7 +160,7 @@ jobs:
       - name: Install Linux build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config patchelf libgtk-3-dev libwebkit2gtk-4.1-dev libasound2-dev libsoup-3.0-dev libmpv-dev libsecret-1-dev libwebp-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config patchelf flatpak ostree libgtk-3-dev libwebkit2gtk-4.1-dev libasound2-dev libsoup-3.0-dev libmpv-dev libsecret-1-dev libwebp-dev
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2
@@ -170,6 +170,24 @@ jobs:
 
       - name: Compose
         run: ./.scripts/compose.sh
+
+      - name: Resolve the Flatpak runtime's libraries
+        run: |
+          set -euo pipefail
+          flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y --noninteractive flathub org.gnome.Platform//51
+          # Every soname the runtime provides. build.sh bundles the rest of
+          # libmpv's closure, so nothing the runtime lacks can be missed and
+          # nothing it provides is shadowed. The runtime's set is authoritative:
+          # its libjpeg/.so.62 and libavcodec/.so.62 differ from the runner's
+          # .so.8/.so.60, and it has no libXpresent at all.
+          find ~/.local/share/flatpak/runtime/*/x86_64/*/active/files \
+               ~/.local/share/flatpak/runtime/*/x86_64/*/*/files \
+               -name '*.so*' -printf '%f\n' 2>/dev/null | sort -u \
+            > "$RUNNER_TEMP/runtime-sonames.txt"
+          echo "runtime provides $(wc -l < "$RUNNER_TEMP/runtime-sonames.txt") libraries"
+          echo "FLATPAK_RUNTIME_LIBS=$RUNNER_TEMP/runtime-sonames.txt" >> "$GITHUB_ENV"
 
       - name: Build Linux
         run: ./.scripts/build.sh linux

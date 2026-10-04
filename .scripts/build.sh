@@ -87,12 +87,16 @@ if [ "$PLATFORM" = "linux" ]; then
     exit 1
   fi
 
-  # Copy libmpv's shared-library closure into bundle/lib, but never anything the
-  # C runtime, the compiler, or a desktop/Flatpak runtime already provides. The
-  # host glib/GTK/Wayland stack must NOT be bundled: inside the Flatpak it
-  # shadows the runtime's newer libraries and breaks them (the runner's glib
-  # 2.80 made the runtime's libgstreamer fail with
-  # "undefined symbol: g_sort_array").
+  # Copy libmpv's shared-library closure into bundle/lib. The exclusion set is
+  # the Flatpak runtime itself: $FLATPAK_RUNTIME_LIBS names a file of the
+  # sonames the runtime provides (the Linux job generates it from the actual
+  # runtime), and anything listed there is left to the runtime. That is
+  # authoritative and needs no hand-maintained list - bundling a library the
+  # runtime also has shadows the runtime's copy (the host's glib 2.80 broke the
+  # runtime's libgstreamer with "undefined symbol: g_sort_array"), while
+  # omitting one it lacks leaves the app with no provider (libjpeg.so.8,
+  # libXpresent.so.1). Without the file, fall back to the curated desktop list.
+  runtime_libs="${FLATPAK_RUNTIME_LIBS:-}"
   copied=()
   copy_closure() {
     local lib="$1" base dep
@@ -100,15 +104,21 @@ if [ "$PLATFORM" = "linux" ]; then
     if [ -e "$libdir/$base" ]; then return 0; fi
     case "$base" in
       libc.so*|libm.so*|libdl.so*|libpthread.so*|librt.so*|libresolv.so*|libnsl.so*|libgcc_s.so*|libstdc++.so*|ld-linux*) return 0 ;;
-      libglib-2.0*|libgobject-2.0*|libgio-2.0*|libgmodule-2.0*|libgthread-2.0*) return 0 ;;
-      libgst*|libgtk*|libgdk*|libpango*|libcairo*|libatk*|libgraphene*) return 0 ;;
-      libharfbuzz*|libfontconfig*|libfreetype*|libfribidi*|libexpat*) return 0 ;;
-      libwayland*|libX*|libxcb*|libxkbcommon*|libgbm*|libdrm*|libepoxy*|libEGL*|libGL*|libvulkan*|libva*|libvdpau*) return 0 ;;
-      libpulse*|libasound*|libpipewire*|libsndfile*) return 0 ;;
-      libdbus-1*|libsystemd*|libselinux*|libmount*|libblkid*|libuuid*) return 0 ;;
-      libffi*|libpcre*|libgcrypt*|libgpg-error*|libcrypto*|libssl*|libcurl*|libnghttp2*) return 0 ;;
-      libsqlite3*|libxml2*|libicu*|liborc*|libgudev*|libudev*) return 0 ;;
     esac
+    if [ -n "$runtime_libs" ] && [ -f "$runtime_libs" ]; then
+      if grep -qxF "$base" "$runtime_libs"; then return 0; fi
+    else
+      case "$base" in
+        libglib-2.0*|libgobject-2.0*|libgio-2.0*|libgmodule-2.0*|libgthread-2.0*) return 0 ;;
+        libgst*|libgtk*|libgdk*|libpango*|libcairo*|libatk*|libgraphene*) return 0 ;;
+        libharfbuzz*|libfontconfig*|libfreetype*|libfribidi*|libexpat*) return 0 ;;
+        libwayland*|libX*|libxcb*|libxkbcommon*|libgbm*|libdrm*|libepoxy*|libEGL*|libGL*|libvulkan*|libva*|libvdpau*) return 0 ;;
+        libpulse*|libasound*|libpipewire*|libsndfile*) return 0 ;;
+        libdbus-1*|libsystemd*|libselinux*|libmount*|libblkid*|libuuid*) return 0 ;;
+        libffi*|libpcre*|libgcrypt*|libgpg-error*|libcrypto*|libssl*|libcurl*|libnghttp2*) return 0 ;;
+        libsqlite3*|libxml2*|libicu*|liborc*|libgudev*|libudev*) return 0 ;;
+      esac
+    fi
     cp -L "$lib" "$libdir/$base"
     copied+=("$libdir/$base")
     while read -r dep; do
