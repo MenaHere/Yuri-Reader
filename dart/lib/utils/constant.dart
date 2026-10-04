@@ -18,7 +18,9 @@ const metadataApiUserAgent =
 const appIconAssets = [
   'assets/app_icons/icon-black.png',
   'assets/app_icons/icon-red.png',
-  'assets/app_icons/icon.png',
+  // The UI tints this logo (More/About, the TV rail), so it is the glyph only:
+  // icon.png carries the cream square, which the tint would paint solid black.
+  'assets/app_icons/icon_glyph.png',
 ];
 
 /// `transparent.png`

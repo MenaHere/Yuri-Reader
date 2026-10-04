@@ -10,6 +10,10 @@
   instead of failing inside the sandbox
 
 #### Fixed
+- The More and About screens showed a solid black block where the app logo
+  should be: the UI tints the logo to the theme colour, but the icon carried
+  the cream square, so the tint filled it. The UI now uses a transparent-glyph
+  variant of the ユ
 - The Linux bundle and the Flatpak now carry every library the app needs that
   the Flatpak runtime lacks (libmpv, the codec stack, libjpeg, libXpresent,
   libxml2, ...) and none that it provides, so the app launches instead of dying

@@ -1,12 +1,16 @@
-// Renders the Yuri-Reader "ユ" app icon at any size, matching
+// Renders the Yuri-Reader "ユ" icon at any size, matching
 // dart/assets/app_icons/icon_v0.7.0_current.svg.
-// Usage: render_icon <size> <out.png> [grey]
-//   grey  - paint a light grey backdrop (preview); otherwise the corners are
-//           transparent, as the SVG's rounded square is.
+// Usage: render_icon <size> <out.png> [grey|glyph]
+//   grey  - the app icon on a light grey backdrop (preview)
+//   glyph - only the ユ strokes, on a transparent background. The UI tints the
+//           logo (More/About, the TV rail), so it must carry no cream square,
+//           or the tint paints a solid block over it.
+//   none  - the app icon: the cream rounded square with the orange ユ
 #include <cairo/cairo.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static void rounded_rect(cairo_t *cr, double w, double h, double r) {
   cairo_new_sub_path(cr);
@@ -19,27 +23,30 @@ static void rounded_rect(cairo_t *cr, double w, double h, double r) {
 
 int main(int argc, char **argv) {
   if (argc < 3) {
-    fprintf(stderr, "usage: render_icon <size> <out.png> [grey]\n");
+    fprintf(stderr, "usage: render_icon <size> <out.png> [grey|glyph]\n");
     return 1;
   }
   const int S = atoi(argv[1]);
   const char *out = argv[2];
-  const int grey = argc > 3;
+  const int glyph = argc > 3 && strcmp(argv[3], "glyph") == 0;
+  const int grey = argc > 3 && !glyph;
   const double k = S / 512.0;
 
   cairo_surface_t *surf =
       cairo_image_surface_create(CAIRO_FORMAT_ARGB32, S, S);
   cairo_t *cr = cairo_create(surf);
 
-  if (grey) {
-    cairo_set_source_rgb(cr, 0.87, 0.87, 0.87);
-    cairo_paint(cr);
-  }
+  if (!glyph) {
+    if (grey) {
+      cairo_set_source_rgb(cr, 0.87, 0.87, 0.87);
+      cairo_paint(cr);
+    }
 
-  // Rounded square, #ffffe5.
-  rounded_rect(cr, S, S, 116 * k);
-  cairo_set_source_rgb(cr, 1.0, 1.0, 0xE5 / 255.0);
-  cairo_fill(cr);
+    // Rounded square, #ffffe5.
+    rounded_rect(cr, S, S, 116 * k);
+    cairo_set_source_rgb(cr, 1.0, 1.0, 0xE5 / 255.0);
+    cairo_fill(cr);
+  }
 
   // Katakana ユ, #ff8c00.
   cairo_set_source_rgb(cr, 0xFF / 255.0, 0x8C / 255.0, 0x00 / 255.0);
