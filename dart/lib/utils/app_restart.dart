@@ -17,6 +17,9 @@ Future<bool> confirmAndRestart(
 }) async {
   final confirmed = await showDialog<bool>(
     context: context,
+    // Only the buttons close this: an accidental tap outside must not cancel a
+    // change the user already asked for.
+    barrierDismissible: false,
     builder: (dialogContext) {
       return AlertDialog(
         title: const Text('Restart required'),

@@ -272,6 +272,9 @@ Future<void> promptImportMangayomiDownloads(
   if (!mangayomiDownloadsExist()) return;
   final accepted = await showDialog<bool>(
     context: context,
+    // Only the buttons close this: an accidental tap outside must not throw the
+    // offer away before the user can answer it.
+    barrierDismissible: false,
     builder: (dialogContext) {
       return AlertDialog(
         title: const Text('Import downloads as well?'),

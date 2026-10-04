@@ -49,6 +49,13 @@
   is now "Welcome to Yuri-Reader", the redundant button is gone, and the
   "Use Mangayomi settings directly" choice is hidden on Android, where the
   Mangayomi database is app-private
+- The first-run screen only scrolled when the pointer was over the narrow
+  middle column, and its card repeated the "Start fresh" action already offered
+  by "Skip for now"; the scroll view now fills the width and the duplicate
+  button is gone
+- The "Import downloads as well?" and restart dialogs closed on a tap outside
+  them, so an accidental tap threw the offer away; they now close only on their
+  own buttons
 
 #### Changed
 - Discord Rich Presence self-labels now read "Yuri-Reader" and link to the

@@ -319,8 +319,8 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
               ),
               const SizedBox(height: 6),
               Text(
-                'Yuri-Reader can bring that library across, keep using that '
-                'folder, or start empty.',
+                'Yuri-Reader can bring that library across, or keep using '
+                'that folder.',
                 textAlign: TextAlign.center,
                 style: l10nText.bodySmall?.copyWith(
                   color: Theme.of(context).hintColor,
@@ -342,10 +342,6 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
                 ),
                 const SizedBox(height: 8),
               ],
-              TextButton(
-                onPressed: _importing ? null : _startFresh,
-                child: const Text('Start fresh'),
-              ),
             ],
           ),
         ),
@@ -382,24 +378,6 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
       reason: "Restarting applies the choice to use Mangayomi's data folder.",
       onConfirmed: () async {
         StorageProvider.setDataDirectory('Mangayomi');
-      },
-    );
-  }
-
-  /// Choice (c): start with an empty Yuri-Reader folder.
-  Future<void> _startFresh() async {
-    ref.read(dataDirChoiceDueProvider.notifier).resolve();
-    if (StorageProvider.dataDirLeaf == 'Yuri-Reader') {
-      setState(() {});
-      return;
-    }
-    if (!mounted) return;
-    await confirmAndRestart(
-      context,
-      ref,
-      reason: 'Restarting starts with an empty Yuri-Reader data folder.',
-      onConfirmed: () async {
-        StorageProvider.setDataDirectory('Yuri-Reader');
       },
     );
   }
@@ -629,6 +607,10 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
     final scaffold = Scaffold(
       body: SafeArea(
         child: Stack(
+          // Expand so the scroll view inside _content fills the width. Inside a
+          // loose Stack it shrinks to the column and only responds to the
+          // scroll gesture over that narrow middle strip.
+          fit: StackFit.expand,
           children: [
             _content(l10n, theme),
             // A way back to change an earlier answer. Absent on the first
@@ -653,15 +635,18 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
   }
 
   Widget _content(AppLocalizations l10n, ThemeData theme) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: isTv ? 48 : 24, vertical: 32)
-            .add(tvPageInsets)
-            // Room for the keyboard, so the repository field and the button
-            // under it stay reachable on a short screen.
-            .add(
-              EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-            ),
+    // The scroll view is the outer widget so it fills the width. Nested inside
+    // a Center it shrinks to the column, and the scroll gesture then only works
+    // over that narrow middle strip.
+    return SingleChildScrollView(
+      padding: EdgeInsets.symmetric(horizontal: isTv ? 48 : 24, vertical: 32)
+          .add(tvPageInsets)
+          // Room for the keyboard, so the repository field and the button
+          // under it stay reachable on a short screen.
+          .add(
+            EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+          ),
+      child: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isTv ? 620 : 420),
           child: Column(
