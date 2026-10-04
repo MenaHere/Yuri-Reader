@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -331,11 +332,16 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
                 child: const Text('Import into Yuri-Reader'),
               ),
               const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: _importing ? null : _useMangayomiSettings,
-                child: const Text("Use Mangayomi's settings"),
-              ),
-              const SizedBox(height: 8),
+              // Running directly on the Mangayomi folder needs a folder the app
+              // can point at; Android keeps its database app-private, so the
+              // choice is not offered there.
+              if (!Platform.isAndroid) ...[
+                OutlinedButton(
+                  onPressed: _importing ? null : _useMangayomiSettings,
+                  child: const Text('Use Mangayomi settings directly'),
+                ),
+                const SizedBox(height: 8),
+              ],
               TextButton(
                 onPressed: _importing ? null : _startFresh,
                 child: const Text('Start fresh'),
@@ -346,49 +352,20 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
       );
       widgets.add(const SizedBox(height: 16));
     }
-    if (mangayomiSourceExists()) {
-      widgets.add(
-        OutlinedButton.icon(
-          onPressed: _importing ? null : _importFromMangayomi,
-          icon: const Icon(Icons.download_for_offline_outlined, size: 20),
-          label: _importLabel,
-        ),
-      );
-      widgets.add(const SizedBox(height: 6));
-    }
     if (widgets.isNotEmpty) widgets.add(const Divider(height: 32));
     return widgets;
-  }
-
-  Widget get _importLabel => _importing
-      ? const SizedBox(
-          height: 18,
-          width: 18,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        )
-      : const Text('Import from Mangayomi');
-
-  /// Imports the library straight from the Mangayomi folder. On the first page
-  /// this is the only action offered, and the downloads import follows as a
-  /// button once it finishes.
-  Future<void> _importFromMangayomi() async {
-    setState(() => _importing = true);
-    try {
-      final imported = await importMangayomiLibrary(context, ref);
-      if (!mounted) return;
-      if (imported) {
-        await promptImportMangayomiDownloads(context, ref);
-      }
-    } finally {
-      if (mounted) setState(() => _importing = false);
-    }
   }
 
   /// Choice (a): snapshot the live Mangayomi database, switch to the
   /// Yuri-Reader folder, and restart so the import runs on a clean database.
   Future<void> _importIntoYuriReader() async {
     ref.read(dataDirChoiceDueProvider.notifier).resolve();
-    await startOnboardingImportIntoYuriReader(context, ref);
+    setState(() => _importing = true);
+    try {
+      await startOnboardingImportIntoYuriReader(context, ref);
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
   }
 
   /// Choice (b): keep running directly on the Mangayomi folder.
@@ -803,7 +780,7 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
   }
 
   String _title(AppLocalizations l10n) => switch (_step) {
-    _Step.libraries => l10n.onboarding_title,
+    _Step.libraries => 'Welcome to Yuri-Reader',
     _Step.navigation => l10n.onboarding_nav_title,
     _Step.repository => l10n.onboarding_repo_title,
   };

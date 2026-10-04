@@ -12,8 +12,8 @@
   found: import it into Yuri-Reader, keep running directly on the Mangayomi
   folder, or start fresh
 - "Import from Mangayomi" and "Import downloads from Mangayomi" actions in
-  More -> Data and storage, and on the first-run page; the downloads offer
-  follows a successful library import
+  More -> Data and storage; the downloads offer follows a successful library
+  import
 - A "Data directory" tile in Data and storage shows the resolved folder and
   switches between Yuri-Reader and Mangayomi, restarting after confirmation
 
@@ -44,6 +44,11 @@
 - Cancelling the data-directory restart still applied the new folder on the
   next launch: the folder is now changed only after the user confirms the
   restart, and a cancelled import drops its staged snapshot
+- The first-run screen still titled itself "Welcome to Mangayomi" and offered a
+  redundant "Import from Mangayomi" button beside the import choice; the title
+  is now "Welcome to Yuri-Reader", the redundant button is gone, and the
+  "Use Mangayomi settings directly" choice is hidden on Android, where the
+  Mangayomi database is app-private
 
 #### Changed
 - Discord Rich Presence self-labels now read "Yuri-Reader" and link to the
