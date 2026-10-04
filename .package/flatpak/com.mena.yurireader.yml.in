@@ -9,8 +9,10 @@ build-options:
   no-debuginfo: true
 finish-args:
   - --share=ipc
+  - --share=network
   - --socket=wayland
   - --socket=fallback-x11
+  - --socket=pulseaudio
   - --device=dri
   # The local-library feature reads and writes folders the user chooses, so the
   # home filesystem is the smallest grant that keeps that core feature working.
