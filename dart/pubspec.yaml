@@ -1,6 +1,6 @@
 name: yuri_reader
-description: Free and open source manga reader and anime streaming
-  cross-plateform app inspired by Tachiyomi and Aniyomi.
+description: Forked from mangayomi with incorporation of MALSync: a free and open source manga reader and anime streaming
+  cross-plateform app.
 publish_to: "none"
 version: 0.7.3
 
