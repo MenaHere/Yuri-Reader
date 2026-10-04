@@ -315,7 +315,6 @@ class MalSyncTypeSwitch extends StatelessWidget {
       onTap: () => onChanged(value),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        margin: const EdgeInsets.all(-2),
         decoration: BoxDecoration(
           color: selected ? MalSyncStyle.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(30),

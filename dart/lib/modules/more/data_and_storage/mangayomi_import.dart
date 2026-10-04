@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
@@ -22,6 +23,7 @@ import 'package:yuri_reader/models/track_preference.dart';
 import 'package:yuri_reader/models/update.dart';
 import 'package:yuri_reader/modules/more/data_and_storage/widgets/unified_restore.dart';
 import 'package:yuri_reader/providers/storage_provider.dart';
+import 'package:yuri_reader/repositories/settings_repository.dart';
 import 'package:yuri_reader/utils/app_restart.dart';
 
 /// Name of the staged library snapshot written before a restart and consumed
@@ -297,6 +299,73 @@ Future<void> promptImportMangayomiDownloads(
   );
   if (accepted != true || !context.mounted) return;
   await importMangayomiDownloads(context, ref);
+}
+
+/// Copies the Mangayomi extension-server bundle (JRE + server JAR) into the
+/// Yuri-Reader data folder and repoints the imported `jrePath` /
+/// `extensionServerPath` at the copy, so the imported Extension Server does not
+/// depend on the Mangayomi folder staying around.
+Future<void> relocateExtensionServerBundle() async {
+  final source = mangayomiSourcePath();
+  if (source == null) return;
+  final sourceRoot = Directory(p.join(source, 'extension_server'));
+  if (!await sourceRoot.exists()) return;
+  final target = await StorageProvider().getDefaultDirectory();
+  if (target == null) return;
+  final targetRoot = Directory(p.join(target.path, 'extension_server'));
+  if (p.equals(sourceRoot.path, targetRoot.path)) return;
+
+  var copied = 0;
+  try {
+    await for (final entity in sourceRoot.list(
+      recursive: true,
+      followLinks: false,
+    )) {
+      if (entity is! File) continue;
+      final relative = p.relative(entity.path, from: sourceRoot.path);
+      final destination = File(p.join(targetRoot.path, relative));
+      if (await destination.exists()) continue;
+      await destination.parent.create(recursive: true);
+      await entity.copy(destination.path);
+      copied++;
+    }
+  } catch (e) {
+    debugPrint(
+      '[MangayomiImport] could not copy the extension-server bundle: $e',
+    );
+    return;
+  }
+
+  final settings = settingsRepository.currentOrNull;
+  if (settings == null) return;
+  // Repoint on the `extension_server` segment rather than the source prefix:
+  // the stored path can carry a different absolute root than the one this
+  // process sees (the database may hold the folder's real path while the app
+  // runs with it mounted elsewhere), so a prefix match can miss.
+  String repoint(String? path) {
+    if (path == null || path.isEmpty) return '';
+    final marker = '${p.separator}extension_server${p.separator}';
+    final index = path.indexOf(marker);
+    if (index < 0) return path;
+    final relative = path.substring(index + marker.length);
+    return p.join(targetRoot.path, relative);
+  }
+
+  final newJre = repoint(settings.jrePath);
+  final newServer = repoint(settings.extensionServerPath);
+  if (newJre != (settings.jrePath ?? '') ||
+      newServer != (settings.extensionServerPath ?? '')) {
+    settingsRepository.update((s) {
+      s.jrePath = newJre;
+      s.extensionServerPath = newServer;
+    });
+  }
+  if (kDebugMode) {
+    debugPrint(
+      '[MangayomiImport] extension-server bundle copied ($copied files); '
+      'jre=$newJre extServer=$newServer',
+    );
+  }
 }
 
 Future<File> _pendingImportFile() async {

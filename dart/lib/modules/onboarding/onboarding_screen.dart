@@ -355,19 +355,25 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
   /// Choice (a): snapshot the live Mangayomi database, switch to the
   /// Yuri-Reader folder, and restart so the import runs on a clean database.
   Future<void> _importIntoYuriReader() async {
-    ref.read(dataDirChoiceDueProvider.notifier).resolve();
     setState(() => _importing = true);
     try {
       await startOnboardingImportIntoYuriReader(context, ref);
     } finally {
-      if (mounted) setState(() => _importing = false);
+      if (mounted) {
+        // Resolve only after the flow has finished. Resolving first flips the
+        // gate in main.dart, which unmounts this screen and the Navigator that
+        // owns the restart dialog while the dialog is still open, so the
+        // dialog is torn down before the user can answer it.
+        ref.read(dataDirChoiceDueProvider.notifier).resolve();
+        setState(() => _importing = false);
+      }
     }
   }
 
   /// Choice (b): keep running directly on the Mangayomi folder.
   Future<void> _useMangayomiSettings() async {
-    ref.read(dataDirChoiceDueProvider.notifier).resolve();
     if (StorageProvider.dataDirLeaf == 'Mangayomi') {
+      ref.read(dataDirChoiceDueProvider.notifier).resolve();
       setState(() {});
       return;
     }
@@ -380,6 +386,9 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
         StorageProvider.setDataDirectory('Mangayomi');
       },
     );
+    // Resolve only after the dialog has closed, or the gate unmounts this
+    // screen (and the dialog's Navigator) while the dialog is still open.
+    if (mounted) ref.read(dataDirChoiceDueProvider.notifier).resolve();
   }
 
   /// Adds a folder of the user's own files.

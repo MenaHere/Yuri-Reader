@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:yuri_reader/eval/model/m_bridge.dart';
 import 'package:yuri_reader/models/manga.dart';
+import 'package:yuri_reader/modules/more/data_and_storage/mangayomi_import.dart';
 import 'package:yuri_reader/modules/more/data_and_storage/providers/backup_decoder.dart';
 import 'package:yuri_reader/modules/more/data_and_storage/providers/backup_format.dart';
 import 'package:yuri_reader/modules/more/data_and_storage/providers/pre_import_backup.dart';
@@ -95,7 +96,11 @@ Future<bool> performRestore(BuildContext context, WidgetRef ref) async {
     }
 
     if (!context.mounted) return false;
-    final keepExisting = await _chooseImportMode(context);
+    final keepExisting = await _chooseImportMode(
+      context,
+      title: 'Restore backup into YuriReader',
+      sourceLabel: 'this backup',
+    );
     if (keepExisting == null || !context.mounted) return false;
 
     var categoryDecisions = const <String, bool>{};
@@ -213,7 +218,11 @@ Future<bool> performMangayomiFolderImport(
     final l10n = context.l10n;
     final preview = previewMangayomiBackup(backup);
 
-    final keepExisting = await _chooseImportMode(context);
+    final keepExisting = await _chooseImportMode(
+      context,
+      title: 'Import Mangayomi library into YuriReader',
+      sourceLabel: 'the Mangayomi library',
+    );
     if (keepExisting == null || !context.mounted) return false;
 
     var categoryDecisions = const <String, bool>{};
@@ -283,6 +292,9 @@ Future<bool> performMangayomiFolderImport(
           decodedMangayomiBackup: backup,
         ).future,
       );
+      // Self-contained Extension Server: copy the Mangayomi bundle into this
+      // data folder and repoint the imported paths at the copy.
+      if (context.mounted) await relocateExtensionServerBundle();
     } finally {
       if (context.mounted) hideBusyDialog(context);
     }
@@ -347,7 +359,11 @@ Future<void> _performMangayomiRestore(
     final l10n = context.l10n;
     final preview = previewMangayomiBackup(backup);
 
-    final keepExisting = await _chooseImportMode(context);
+    final keepExisting = await _chooseImportMode(
+      context,
+      title: 'Restore Mangayomi backup into YuriReader',
+      sourceLabel: 'this Mangayomi backup',
+    );
     if (keepExisting == null || !context.mounted) return;
 
     var categoryDecisions = const <String, bool>{};
@@ -455,28 +471,30 @@ Future<bool?> _confirmPlainRestore(BuildContext context) {
   );
 }
 
-Future<bool?> _chooseImportMode(BuildContext context) {
-  final l10n = context.l10n;
+/// Asks how an incoming library should be applied. Both choices name the
+/// source and the destination, because a bare "this" left the user guessing
+/// what was being imported and what "Replace" would replace.
+Future<bool?> _chooseImportMode(
+  BuildContext context, {
+  required String title,
+  required String sourceLabel,
+}) {
   return showDialog<bool>(
     context: context,
     builder: (dialogContext) {
       return AlertDialog(
-        title: Text(l10n.import_mode_title),
+        title: Text(title),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           spacing: 8,
           children: [
-            Text(
-              l10n.import_mode_message,
-              style: TextStyle(fontSize: 12, color: context.secondaryColor),
-            ),
-            const SizedBox(height: 4),
             ListTile(
               leading: const Icon(Icons.merge_type_rounded),
-              title: Text(l10n.import_mode_keep_existing),
+              title: Text('Merge $sourceLabel into YuriReader'),
               subtitle: Text(
-                l10n.import_mode_keep_existing_subtitle,
+                'Adds the imported series into YuriReader and updates matching '
+                'ones. Nothing already in YuriReader is removed.',
                 style: TextStyle(fontSize: 11, color: context.secondaryColor),
               ),
               onTap: () => Navigator.pop(dialogContext, true),
@@ -487,11 +505,12 @@ Future<bool?> _chooseImportMode(BuildContext context) {
                 color: Colors.red,
               ),
               title: Text(
-                l10n.import_mode_replace,
+                'Replace YuriReader library with $sourceLabel',
                 style: const TextStyle(color: Colors.red),
               ),
               subtitle: Text(
-                l10n.import_mode_replace_subtitle,
+                'Deletes everything in YuriReader, then adds the imported '
+                'series.',
                 style: TextStyle(fontSize: 11, color: context.secondaryColor),
               ),
               onTap: () => Navigator.pop(dialogContext, false),

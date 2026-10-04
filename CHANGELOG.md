@@ -1,6 +1,6 @@
 # Yuri-Reader - Change Log
 
-## Unreleased
+## Version 0.7.3
 
 ### [2026-10-04]
 
@@ -56,6 +56,24 @@
 - The "Import downloads as well?" and restart dialogs closed on a tap outside
   them, so an accidental tap threw the offer away; they now close only on their
   own buttons
+- "Import into Yuri-Reader" left the restart dialog invisible and the app on an
+  empty library: resolving the data-directory choice unmounted the first-run
+  screen (and the Navigator that owns the dialog) before the dialog could be
+  answered; the choice is now resolved only after the flow finishes
+- The import dialog asked only "How should this be imported?", leaving "this"
+  undefined; every choice now names the source and the destination
+- Importing a Mangayomi library raised a spurious "Sources not found" prompt and
+  left the imported series without a live source: the preview ignored the
+  sources the backup carries, and a merge bound each manga to its source before
+  those sources were restored
+- The imported Extension Server (JRE + server JAR) and Android proxy server were
+  dropped, because the restore kept the current device's empty values; both now
+  come across with the rest of the settings
+- The extension-server bundle is now copied into the Yuri-Reader data folder and
+  the imported paths repointed at the copy, so the imported Extension Server no
+  longer depends on the Mangayomi folder remaining
+- Opening MAL-Sync threw a `Container` assertion and a large overflow: the
+  Anime/Manga pill carried a negative margin, which Flutter rejects
 
 #### Changed
 - Discord Rich Presence self-labels now read "Yuri-Reader" and link to the
