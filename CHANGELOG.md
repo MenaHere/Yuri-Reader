@@ -1,5 +1,54 @@
 # Yuri-Reader - Change Log
 
+## Unreleased
+
+### [2026-10-04]
+
+#### Added
+- Data directory is now `Yuri-Reader` on every platform that allows it (Android
+  `/storage/emulated/0/Yuri-Reader/` and `Pictures/Yuri-Reader/`, desktop
+  `<Documents>/Yuri-Reader`), persisted in a marker file in app support
+- First run offers a three-way choice when an existing Mangayomi folder is
+  found: import it into Yuri-Reader, keep running directly on the Mangayomi
+  folder, or start fresh
+- "Import from Mangayomi" and "Import downloads from Mangayomi" actions in
+  More -> Data and storage, and on the first-run page; the downloads offer
+  follows a successful library import
+- A "Data directory" tile in Data and storage shows the resolved folder and
+  switches between Yuri-Reader and Mangayomi, restarting after confirmation
+
+#### Changed
+- Onboarding and the startup gate now appear for existing installs that have
+  not yet chosen a data directory
+- Switching the data directory asks before restarting instead of closing the
+  app silently
+
+### [2026-10-04]
+
+#### Fixed
+- OAuth sign-in on mobile failed because the Dart redirect URI and callback
+  scheme still used `mangayomi` while the Android/iOS/macOS configs register
+  `yurireader`; the AniList and MyAnimeList logins now use the registered
+  `yurireader` scheme
+- The Android device, torrent-server and local-directory-access method
+  channels still used `com.kodjodevf.mangayomi.*` while the composed Kotlin
+  registers `com.mena.yurireader.*`, so the calls failed silently; the Dart
+  callers now match
+- Local libraries stored under the new `Yuri-Reader/local` data folder were not
+  recognized: the library queries and the stored-path resolver now accept both
+  `Yuri-Reader/local` and the legacy `Mangayomi/local`
+- The Linux build warned that libavif headers were missing and shipped without
+  AVIF decoding: the CI now installs `libavif-dev`, and the bundle copies the
+  `dlopen`ed libavif (which is not in libmpv's closure) so AVIF chapter images
+  decode
+- Cancelling the data-directory restart still applied the new folder on the
+  next launch: the folder is now changed only after the user confirms the
+  restart, and a cancelled import drops its staged snapshot
+
+#### Changed
+- Discord Rich Presence self-labels now read "Yuri-Reader" and link to the
+  fork instead of upstream
+
 ## Version 0.7.2
 
 ### [2026-10-03]

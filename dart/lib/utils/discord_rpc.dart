@@ -29,8 +29,8 @@ class DiscordRPC {
     assets: const RPCAssets(largeImage: "app-icon", largeText: "YuriReader"),
     buttons: [
       const RPCButton(
-        label: "Get Mangayomi",
-        url: "https://github.com/kodjodevf/mangayomi",
+        label: "Get Yuri-Reader",
+        url: "https://github.com/MenaHere/Yuri-Reader",
       ),
       const RPCButton(
         label: "Join us",
@@ -116,7 +116,7 @@ class DiscordRPC {
               largeImage: imageUrl,
               largeText: rpcShowTitle ? chapter.manga.value!.name : "-----",
               smallImage: "app-icon",
-              smallText: "Mangayomi",
+              smallText: "Yuri-Reader",
             )
           : const RPCAssets(largeImage: "app-icon", largeText: "YuriReader"),
     );
@@ -134,7 +134,7 @@ class DiscordRPC {
         largeImage: largeImage,
         largeText: largeText,
         smallImage: "app-icon",
-        smallText: "Mangayomi",
+        smallText: "Yuri-Reader",
       ),
     );
   }

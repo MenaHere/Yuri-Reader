@@ -1,4 +1,5 @@
 // ignore_for_file: depend_on_referenced_packages
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -32,14 +33,171 @@ String? linuxDocumentsFallbackPath(Map<String, String> environment) {
 }
 
 class StorageProvider {
+  /// The one-line marker that records which data directory this install runs
+  /// on. It lives in the app-support directory, which is fixed for the
+  /// install, so it is readable before any database opens.
+  static const _dataDirMarkerFileName = 'yuri_reader_data_dir';
 
-  /// Data directory name: "Yuri-Reader" for new installs, falling back to
-  /// "Mangayomi" when an existing install's data folder is present, so
-  /// existing libraries / downloads are not silently orphaned.
+  /// The resolved data-directory leaf ("Yuri-Reader" or "Mangayomi"), cached
+  /// by [initDataDirectory] so [dataDirName] can stay synchronous.
+  static String? _cachedDataDirLeaf;
+
+  /// The directory that holds the data-directory leaf. Android shared storage
+  /// on Android, Application Support on macOS, Documents everywhere else.
+  static String? _cachedParentPath;
+
+  /// The app-support directory that holds the marker file.
+  static String? _cachedAppSupportPath;
+
+  /// Whether the marker file existed when the app started. [Mangayomi] exists
+  /// is only consulted when it did not.
+  static bool _markerPresent = false;
+
+  /// The Leaf name the install is currently using.
+  static String get dataDirLeaf => _cachedDataDirLeaf ?? 'Yuri-Reader';
+
+  /// The directory holding the data-directory leaf, once resolved.
+  static String? get cachedDataParentPath => _cachedParentPath;
+
+  /// Whether the first launch must offer a data-directory choice: a Mangayomi
+  /// folder exists and this install has never chosen a leaf.
+  static bool get dataDirChoiceRequired {
+    final parent = _cachedParentPath;
+    if (parent == null || _markerPresent) return false;
+    return Directory(path.join(parent, 'Mangayomi')).existsSync() &&
+        !Directory(path.join(parent, 'Yuri-Reader')).existsSync();
+  }
+
+  /// Data directory name: the cached choice when one was made, otherwise
+  /// "Yuri-Reader" when it exists, then "Mangayomi" when it exists, and
+  /// "Yuri-Reader" for a fresh install.
   static String dataDirName(String parentPath) =>
-      Directory(path.join(parentPath, 'Mangayomi')).existsSync()
-          ? 'Mangayomi'
-          : 'Yuri-Reader';
+      _cachedDataDirLeaf ?? _resolveLeafFromExistence(parentPath);
+
+  static String _resolveLeafFromExistence(String parentPath) {
+    if (Directory(path.join(parentPath, 'Yuri-Reader')).existsSync()) {
+      return 'Yuri-Reader';
+    }
+    if (Directory(path.join(parentPath, 'Mangayomi')).existsSync()) {
+      return 'Mangayomi';
+    }
+    return 'Yuri-Reader';
+  }
+
+  /// The directory that holds the data leaf, per platform. macOS keeps its
+  /// database under Application Support, so its leaf is there too. iOS is the
+  /// app sandbox and never uses a leaf name.
+  static Future<String> _platformParentPath() async {
+    if (Platform.isAndroid) return '/storage/emulated/0';
+    if (Platform.isMacOS) {
+      return (await getApplicationSupportDirectory()).path;
+    }
+    try {
+      return (await getApplicationDocumentsDirectory()).path;
+    } catch (e) {
+      if (!Platform.isLinux) rethrow;
+      final home = linuxDocumentsFallbackPath(Platform.environment);
+      if (home == null) rethrow;
+      return home;
+    }
+  }
+
+  /// Resolves and caches which data directory this launch uses. Must run
+  /// before the first [getDefaultDirectory] or [initDB] so the marker wins
+  /// over the existence fallback.
+  static Future<void> initDataDirectory() async {
+    final support = await getApplicationSupportDirectory();
+    _cachedAppSupportPath = support.path;
+    final parent = await _platformParentPath();
+    _cachedParentPath = parent;
+    final marker = File(path.join(support.path, _dataDirMarkerFileName));
+    if (await marker.exists()) {
+      final leaf = (await marker.readAsString()).trim();
+      if (leaf == 'Yuri-Reader' || leaf == 'Mangayomi') {
+        _markerPresent = true;
+        _cachedDataDirLeaf = leaf;
+        return;
+      }
+      debugPrint('[Storage] ignoring invalid data-dir marker "$leaf"');
+    }
+    _markerPresent = false;
+    _cachedDataDirLeaf = _resolveLeafFromExistence(parent);
+  }
+
+  /// Persists a data-directory choice and returns whether it differs from the
+  /// one in effect. The directories are created best-effort; failing to make
+  /// one does not lose the choice, which the next launch retries.
+  static bool setDataDirectory(String leaf) {
+    final changed = _cachedDataDirLeaf != leaf;
+    _cachedDataDirLeaf = leaf;
+    _markerPresent = true;
+    final support = _cachedAppSupportPath;
+    if (support != null) {
+      try {
+        Directory(support).createSync(recursive: true);
+        File(path.join(support, _dataDirMarkerFileName)).writeAsStringSync(leaf);
+      } catch (e) {
+        debugPrint('[Storage] could not write the data-dir marker: $e');
+      }
+    } else {
+      unawaited(_writeDataDirMarker(leaf));
+    }
+    final parent = _cachedParentPath;
+    if (parent != null) {
+      try {
+        Directory(path.join(parent, leaf)).createSync(recursive: true);
+      } catch (e) {
+        debugPrint('[Storage] could not create the data directory: $e');
+      }
+    } else {
+      unawaited(_createDataDirectory(leaf));
+    }
+    return changed;
+  }
+
+  static Future<void> _writeDataDirMarker(String leaf) async {
+    try {
+      final support = await getApplicationSupportDirectory();
+      _cachedAppSupportPath = support.path;
+      await Directory(support.path).create(recursive: true);
+      await File(
+        path.join(support.path, _dataDirMarkerFileName),
+      ).writeAsString(leaf);
+    } catch (e) {
+      debugPrint('[Storage] could not write the data-dir marker: $e');
+    }
+  }
+
+  static Future<void> _createDataDirectory(String leaf) async {
+    try {
+      final parent = await _platformParentPath();
+      await Directory(path.join(parent, leaf)).create(recursive: true);
+    } catch (e) {
+      debugPrint('[Storage] could not create the data directory: $e');
+    }
+  }
+
+  /// The schemas every Isar environment opens with. Single source of truth so
+  /// the app database and a foreign database can be opened with the same set.
+  static final List<CollectionSchema<dynamic>> dbSchemas = [
+    MangaSchema,
+    ChangedPartSchema,
+    ChapterSchema,
+    CategorySchema,
+    CustomButtonSchema,
+    UpdateSchema,
+    HistorySchema,
+    DownloadSchema,
+    SourceSchema,
+    SettingsSchema,
+    TrackPreferenceSchema,
+    TrackSchema,
+    SyncPreferenceSchema,
+    SourcePreferenceSchema,
+    SourcePreferenceStringValueSchema,
+    BackupPasswordFallbackSchema,
+  ];
+
   static final StorageProvider _instance = StorageProvider._internal();
   StorageProvider._internal();
   factory StorageProvider() => _instance;
@@ -81,7 +239,9 @@ class StorageProvider {
   Future<Directory?> getDefaultDirectory() async {
     Directory? directory;
     if (Platform.isAndroid) {
-      directory = Directory("/storage/emulated/0/Mangayomi/");
+      directory = Directory(
+        "/storage/emulated/0/${dataDirName('/storage/emulated/0')}/",
+      );
     } else {
       final dir = await _documentsDirectory();
       // The documents dir in iOS is already named "Mangayomi".
@@ -173,7 +333,9 @@ class StorageProvider {
     }
     if (Platform.isAndroid) {
       directory = Directory(
-        dPath.isEmpty ? "/storage/emulated/0/Mangayomi/" : "$dPath/",
+        dPath.isEmpty
+            ? "/storage/emulated/0/${dataDirName('/storage/emulated/0')}/"
+            : "$dPath/",
       );
     } else {
       final dir = await _documentsDirectory();
@@ -289,7 +451,7 @@ class StorageProvider {
   Future<Directory?> getGalleryDirectory() async {
     String gPath;
     if (Platform.isAndroid) {
-      gPath = "/storage/emulated/0/Pictures/Mangayomi/";
+      gPath = "/storage/emulated/0/Pictures/Yuri-Reader/";
     } else {
       gPath = path.join((await getDirectory())!.path, 'Pictures');
     }
@@ -327,24 +489,7 @@ class StorageProvider {
     }
 
     final isar = await Isar.open(
-      [
-        MangaSchema,
-        ChangedPartSchema,
-        ChapterSchema,
-        CategorySchema,
-        CustomButtonSchema,
-        UpdateSchema,
-        HistorySchema,
-        DownloadSchema,
-        SourceSchema,
-        SettingsSchema,
-        TrackPreferenceSchema,
-        TrackSchema,
-        SyncPreferenceSchema,
-        SourcePreferenceSchema,
-        SourcePreferenceStringValueSchema,
-        BackupPasswordFallbackSchema,
-      ],
+      dbSchemas,
       directory: dir!.path,
       name: "mangayomiDb",
       inspector: inspector,

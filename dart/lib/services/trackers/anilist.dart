@@ -27,7 +27,7 @@ class Anilist extends _$Anilist implements BaseTracker {
   static const String _baseApiUrl = "https://graphql.anilist.co/";
   final String _redirectUri = _isDesktop
       ? 'http://localhost:43824/success?code=1337'
-      : 'mangayomi://success?code=1337';
+      : 'yurireader://success?code=1337';
   final String _clientSecret = _isDesktop
       ? 'tJA13cAR2tCCXrJCwwvmwEDbWRoIaahFiJTXToHd'
       : 'G2fFUiGtgFd60D0lCkhgGKvMmrCfDmZXADQIzWXr';
@@ -42,7 +42,7 @@ class Anilist extends _$Anilist implements BaseTracker {
   Future<bool?> login() async {
     final callbackUrlScheme = _isDesktop
         ? 'http://localhost:43824'
-        : 'mangayomi';
+        : 'yurireader';
     final loginUrl =
         'https://anilist.co/api/v2/oauth/authorize?client_id=$_clientId'
         '&redirect_uri=$_redirectUri&response_type=code';

@@ -128,6 +128,11 @@ if [ "$PLATFORM" = "linux" ]; then
   }
   copy_closure "$mpv"
 
+  # libavif is dlopen()ed by the native image decoder, so it is not in libmpv's
+  # closure; copy it explicitly so AVIF decoding works in the bundle.
+  avif="$(ldconfig -p | awk '/libavif\.so\.16 /{print $NF; exit}')"
+  [ -n "$avif" ] && copy_closure "$avif"
+
   # Point each bundled library at its own directory so its dependencies resolve
   # inside bundle/lib; the executable already carries $ORIGIN/lib and finds
   # libmpv directly. Nothing outside the media stack is shadowed, so the

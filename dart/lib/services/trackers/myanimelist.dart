@@ -46,7 +46,7 @@ class MyAnimeList extends _$MyAnimeList implements BaseTracker {
   Future<bool?> login() async {
     final callbackUrlScheme = _isDesktop
         ? 'http://localhost:43824'
-        : 'mangayomi';
+        : 'yurireader';
     final loginUrl = _authUrl();
 
     try {

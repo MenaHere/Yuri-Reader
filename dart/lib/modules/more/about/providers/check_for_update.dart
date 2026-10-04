@@ -56,9 +56,6 @@ Future<UpdateInfo?> _getUpdateIfAvailable() async {
     log(info.data.toString());
   }
   final latest = await _fetchLatestRelease();
-  if (latest == null) {
-    return null;
-  }
   if (compareVersions(info.version, latest.$1) >= 0) {
     return null;
   }

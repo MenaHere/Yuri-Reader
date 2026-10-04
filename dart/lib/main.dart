@@ -27,6 +27,9 @@ import 'package:yuri_reader/models/track_search.dart';
 import 'package:yuri_reader/modules/manga/detail/providers/track_state_providers.dart';
 import 'package:yuri_reader/modules/malsync/malsync_flash.dart';
 import 'package:yuri_reader/modules/more/data_and_storage/providers/storage_usage.dart';
+import 'package:yuri_reader/modules/more/data_and_storage/mangayomi_import.dart';
+import 'package:yuri_reader/modules/more/data_and_storage/widgets/unified_restore.dart';
+import 'package:yuri_reader/providers/data_dir_choice_provider.dart';
 import 'package:yuri_reader/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:yuri_reader/modules/more/settings/general/providers/general_state_provider.dart';
 import 'package:yuri_reader/providers/l10n_providers.dart';
@@ -123,9 +126,13 @@ void main(List<String> args) async {
         await WindowGeometry.restore();
       }
       if (Platform.isWindows) {
-        registerProtocolHandler("mangayomi");
+        registerProtocolHandler("yurireader");
       }
       final storage = StorageProvider();
+      // Resolve which data directory this launch uses before anything reads a
+      // path or opens a database. The marker in app-support wins; otherwise an
+      // existing install keeps its folder.
+      await StorageProvider.initDataDirectory();
       // Don't force the Android "all files access" (MANAGE_EXTERNAL_STORAGE)
       // prompt at launch. The database lives in scoped app storage, so the app
       // can start, browse and read online without it. The permission is still
@@ -143,7 +150,11 @@ void main(List<String> args) async {
               // is recorded into it.
               await NativeCrashHandler.init(directory);
             })
-            .catchError((_) {}),
+            .catchError((Object error) {
+              // Best-effort: a failure here must not stop the app, but it has
+              // to be visible so a missing crash log is not silent.
+              debugPrint('[Startup] crash-report init skipped: $error');
+            }),
       );
       isar = await storage.initDB(null, inspector: kDebugMode);
       runApp(ProviderScope(child: MyApp(), retry: (retryCount, error) => null));
@@ -227,6 +238,12 @@ class _MyAppState extends ConsumerState<MyApp>
     customDns = ref.read(customDnsStateProvider);
     _initDeepLinks();
     _setupMpvConfig();
+
+    // A data-directory switch that staged a library import leaves the snapshot
+    // behind; consume it once the UI is up so the restore flow has a context.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_runPendingMangayomiImport());
+    });
 
     // Tracker refresh and the local-library filesystem scan compete with the
     // first paint for network/CPU; run them shortly after the UI is up.
@@ -333,7 +350,8 @@ class _MyAppState extends ConsumerState<MyApp>
         // single frame onto whatever the router had underneath it, which is
         // also the frame the browse branch is still building in, so the end of
         // the flow was the roughest part of it.
-        final onboarding = !ref.watch(onboardingCompletedStateProvider);
+        final onboarding = !ref.watch(onboardingCompletedStateProvider) ||
+            ref.watch(dataDirChoiceDueProvider);
         content = AnimatedSwitcher(
           duration: const Duration(milliseconds: 380),
           // The app fades up over most of the window while the first run
@@ -423,8 +441,17 @@ class _MyAppState extends ConsumerState<MyApp>
     super.dispose();
   }
 
+  // Linux emits `resize`/`move` while the window is being resized or moved;
+  // Windows and macOS emit `resized`/`moved` once it settles. Handle both, or
+  // the geometry is never saved on Linux and the window size is not remembered.
+  @override
+  void onWindowResize() => WindowGeometry.save();
+
   @override
   void onWindowResized() => WindowGeometry.save();
+
+  @override
+  void onWindowMove() => WindowGeometry.save();
 
   @override
   void onWindowMoved() => WindowGeometry.save();
@@ -441,6 +468,60 @@ class _MyAppState extends ConsumerState<MyApp>
           .stopServer()
           .timeout(const Duration(seconds: 2), onTimeout: () {})
           .whenComplete(() => exit(0));
+    }
+  }
+
+  /// Consumes a library snapshot staged before a data-directory switch. The
+  /// restore flow needs a live widget context, so it runs here rather than in
+  /// the pre-`runApp` setup. On failure the snapshot is kept and a retry is
+  /// offered.
+  Future<void> _runPendingMangayomiImport() async {
+    final pending = await readPendingMangayomiImport();
+    if (pending == null || !mounted) return;
+    var retry = true;
+    while (retry && mounted) {
+      retry = false;
+      final context = navigatorKey.currentContext ?? this.context;
+      if (!context.mounted) return;
+      final imported = await performMangayomiFolderImport(context, ref, pending);
+      if (!mounted) return;
+      if (imported) {
+        await clearPendingMangayomiImport();
+        if (!mounted) return;
+        final downloadContext = navigatorKey.currentContext ?? context;
+        if (downloadContext.mounted) {
+          await promptImportMangayomiDownloads(downloadContext, ref);
+        }
+        return;
+      }
+      debugPrint(
+        '[MangayomiImport] pending library import did not complete; '
+        'offering a retry',
+      );
+      if (!context.mounted) return;
+      final again = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Import not completed'),
+            content: const Text(
+              'Your Mangayomi library was not imported. You can try again '
+              'now, or keep it staged for the next launch.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Later'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Retry'),
+              ),
+            ],
+          );
+        },
+      );
+      if (again == true) retry = true;
     }
   }
 
