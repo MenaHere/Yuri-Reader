@@ -17,6 +17,7 @@ on:
       - 'CHANGELOG.md'
       - 'README.md'
       - '.package/README.md'
+      - .github/workflows/upstream-sync.yml
   workflow_call:
     inputs:
       linux:
