@@ -1,8 +1,21 @@
 # Yuri-Reader - Change Log
 
+## Unreleased
+
+### [2026-10-07]
+
+#### Fixed
+- The upstream sync no longer renames a pending `## Unreleased` section into a
+  release; it records the sync under `## Unreleased` and releases only when the
+  newest section is already a version. It also no longer drops its sync line
+  into an old release
+
 ## Version 0.7.3+1
 
 ### [2026-10-07]
+
+#### Bot
+- Synced 14 commits from [mangayomi](https://github.com/kodjodevf/mangayomi), 0 commits from [malsync](https://github.com/MALSync/MALSync)
 
 #### Fixed
 - The scheduled upstream sync no longer rebuilds and republishes every platform
@@ -165,7 +178,6 @@
 ### [2026-10-03]
 
 #### Bot
-- Synced 14 commits from [mangayomi](https://github.com/kodjodevf/mangayomi), 0 commits from [malsync](https://github.com/MALSync/MALSync)
 - Synced 28 commits from [mangayomi](https://github.com/kodjodevf/mangayomi), 2 commits from [malsync](https://github.com/MALSync/MALSync)
 
 ## Version 0.6.8

@@ -5,8 +5,12 @@ name: upstream-sync
 # hands the build and release to the reusable release workflow, which builds
 # every platform (Linux + Android + Flatpak) and releases all of them.
 # - No upstream updates (and not forced) -> run succeeds silently.
-# - Sync + analyze green -> BotYYYYMMDDnnn commit (submodule bumps + version
-#   bump + changelog entry) and the release workflow releases all platforms.
+# - Sync + analyze green, newest changelog section a version -> BotYYYYMMDDnnn
+#   commit (submodule bumps + version bump + changelog entry) and the release
+#   workflow releases all platforms.
+# - Sync + analyze green, newest section `## Unreleased` -> the sync is recorded
+#   under `## Unreleased` with no version bump and no release: that section is a
+#   pending (usually human) release and must not ship as a `+1`.
 # - Sync + analyze red -> the same commit without a version bump, the changelog
 #   entry marked `## Unreleased`, and no release. The sync still lands on main
 #   so the code can be fixed against the new upstream.
@@ -40,6 +44,9 @@ jobs:
       # workflow (which, seeing a released version at the top of the changelog,
       # rebuilt and republished it in full).
       changed: ${{ steps.check.outputs.changed }}
+      # True only when the green changelog step made a new version. A sync that
+      # landed under `## Unreleased` leaves this empty, so it is not released.
+      released: ${{ steps.changelog.outputs.released }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -108,10 +115,11 @@ jobs:
         working-directory: .build/app
         run: dart pub get --directory=rust_builder/cargokit/build_tool
 
-      # The bot's gate: analyze errors only. A green analyze means the sync is
-      # released (version bump + release); a red one means the sync is committed
-      # as `## Unreleased` with no release. The heavy per-platform builds and
-      # the release itself are done by the reusable release workflow.
+      # The bot's gate: analyze errors only. A green analyze releases the sync
+      # (version bump + release) only when the newest changelog section is
+      # already a version; a red one means the sync is committed as
+      # `## Unreleased` with no release. The heavy per-platform builds and the
+      # release itself are done by the reusable release workflow.
       - name: Flutter analyze
         if: steps.check.outputs.changed == 'true'
         working-directory: .build/app
@@ -119,49 +127,59 @@ jobs:
 
       # The sync is committed whether or not the analyze passed, so a failed
       # sync still lands on main and the code can be fixed against the new
-      # upstream. The two changelog steps pick released vs unreleased with the
-      # step status functions, which are only valid in if: - success() means
-      # every earlier step passed, failure() means one of them did not.
-      - name: Changelog (released)
+      # upstream. The two changelog steps pick green vs red with the step status
+      # functions, which are only valid in if: - success() means every earlier
+      # step passed, failure() means one of them did not.
+      #
+      # A release happens only when the newest section is already a version.
+      # When it is `## Unreleased` the sync is recorded under it and nothing is
+      # released: that section is a pending (usually human) release, possibly a
+      # major one, and renaming it to `+1` would ship it as a patch.
+      - name: Changelog (green)
+        id: changelog
         if: success() && steps.check.outputs.real == 'true'
         run: |
-          VER="$(grep '^version:' dart/pubspec.yaml | cut -d' ' -f2)"
-          if [[ "$VER" == *+* ]]; then
-            BASE="${VER%+*}"
-            BUILD="${VER##*+}"
-            NEW_VER="${BASE}+$((BUILD + 1))"
-          else
-            NEW_VER="${VER}+1"
-          fi
-          sed -i "s/^version: .*/version: $NEW_VER/" dart/pubspec.yaml
           DATE="$(date -u +%Y-%m-%d)"
           BULLET="- Synced ${{ steps.check.outputs.manga_count }} commits from [mangayomi](https://github.com/kodjodevf/mangayomi), ${{ steps.check.outputs.mal_count }} commits from [malsync](https://github.com/MALSync/MALSync)"
           if [ "$(sed -n '3p' CHANGELOG.md)" = "## Unreleased" ]; then
-            # A pending sync finally builds: turn its section into this version.
-            awk -v h="## Version $NEW_VER" -v b="$BULLET" '
-              NR==3 && $0=="## Unreleased" { print h; next }
-              !ins && /^#### Bot$/ { print; print b; ins=1; next }
+            # Pending release: record the sync under it, do not bump or release.
+            # A fresh `#### Bot` goes right after the section's `### [date]`
+            # line, above whatever is already there (newest on top).
+            awk -v b="$BULLET" '
+              !ins && /^### \[/ { print; print ""; print "#### Bot"; print b; ins=1; next }
               { print }
             ' CHANGELOG.md > CHANGELOG.md.new && mv CHANGELOG.md.new CHANGELOG.md
+            echo "released=false" >> "$GITHUB_OUTPUT"
           else
+            # Newest section is a version: this sync is its own release.
+            VER="$(grep '^version:' dart/pubspec.yaml | cut -d' ' -f2)"
+            if [[ "$VER" == *+* ]]; then
+              BASE="${VER%+*}"
+              BUILD="${VER##*+}"
+              NEW_VER="${BASE}+$((BUILD + 1))"
+            else
+              NEW_VER="${VER}+1"
+            fi
+            sed -i "s/^version: .*/version: $NEW_VER/" dart/pubspec.yaml
             {
               printf '# Yuri-Reader - Change Log\n\n'
               printf '## Version %s\n\n### [%s]\n\n#### Bot\n' "$NEW_VER" "$DATE"
               printf -- '%s\n' "$BULLET"
               tail -n +2 CHANGELOG.md
             } > CHANGELOG.md.new && mv CHANGELOG.md.new CHANGELOG.md
+            echo "released=true" >> "$GITHUB_OUTPUT"
+            echo "version: $VER -> $NEW_VER"
           fi
-          echo "version: $VER -> $NEW_VER"
 
-      - name: Changelog (unreleased)
+      - name: Changelog (red)
         if: failure() && steps.check.outputs.real == 'true'
         run: |
           DATE="$(date -u +%Y-%m-%d)"
           BULLET="- [$DATE] Synced ${{ steps.check.outputs.manga_count }} commits from [mangayomi](https://github.com/kodjodevf/mangayomi), ${{ steps.check.outputs.mal_count }} commits from [malsync](https://github.com/MALSync/MALSync)"
           if [ "$(sed -n '3p' CHANGELOG.md)" = "## Unreleased" ]; then
-            # Already pending: append this sync to the same section.
+            # Already pending: record this sync under it, newest on top.
             awk -v b="$BULLET" '
-              !ins && /^#### Bot$/ { print; print b; ins=1; next }
+              !ins && /^### \[/ { print; print ""; print "#### Bot"; print b; ins=1; next }
               { print }
             ' CHANGELOG.md > CHANGELOG.md.new && mv CHANGELOG.md.new CHANGELOG.md
           else
@@ -191,10 +209,11 @@ jobs:
         run: git push
 
   # Builds every platform and releases all of them. Runs only when the sync job
-  # actually changed something (upstream updates, or a forced run) and succeeded
-  # (analyze green), so the changelog is a released version.
+  # changed something (upstream updates, or a forced run), succeeded (analyze
+  # green), and its newest changelog section was already a version, so it made a
+  # release. A sync recorded under `## Unreleased` does not call this.
   release:
     needs: sync
-    if: success() && needs.sync.outputs.changed == 'true'
+    if: success() && needs.sync.outputs.changed == 'true' && needs.sync.outputs.released == 'true'
     uses: ./.github/workflows/release.yml
     secrets: inherit
