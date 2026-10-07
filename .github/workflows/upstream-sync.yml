@@ -34,6 +34,12 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    outputs:
+      # False only when there is no upstream update and no force. The release
+      # job gates on it so a scheduled no-op run does not call the release
+      # workflow (which, seeing a released version at the top of the changelog,
+      # rebuilt and republished it in full).
+      changed: ${{ steps.check.outputs.changed }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -184,10 +190,11 @@ jobs:
         if: always() && steps.check.outputs.real == 'true'
         run: git push
 
-  # Builds every platform and releases all of them. Runs only when the sync
-  # job succeeded (analyze green), so the changelog is a released version.
+  # Builds every platform and releases all of them. Runs only when the sync job
+  # actually changed something (upstream updates, or a forced run) and succeeded
+  # (analyze green), so the changelog is a released version.
   release:
     needs: sync
-    if: success()
+    if: success() && needs.sync.outputs.changed == 'true'
     uses: ./.github/workflows/release.yml
     secrets: inherit
