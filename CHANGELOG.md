@@ -1,5 +1,13 @@
 # Yuri-Reader - Change Log
 
+## Unreleased
+
+### [2026-10-07]
+
+#### Fixed
+- The scheduled upstream sync no longer rebuilds and republishes every platform
+  when there are no upstream updates
+
 ## Version 0.7.3
 
 ### [2026-10-04]
