@@ -50,15 +50,15 @@ dependencies:
   encrypt: ^5.0.3
   media_kit:
     git:
-      url: https://github.com/Schnitzel5/media-kit.git
+      url: https://github.com/kodjodevf/media-kit.git
       path: media_kit
   media_kit_video:
     git:
-      url: https://github.com/Schnitzel5/media-kit.git
+      url: https://github.com/kodjodevf/media-kit.git
       path: media_kit_video
   media_kit_libs_video:
     git:
-      url: https://github.com/Schnitzel5/media-kit.git
+      url: https://github.com/kodjodevf/media-kit.git
       path: libs/universal/media_kit_libs_video
   crypto: ^3.0.7
   cupertino_icons: ^1.0.9
@@ -99,8 +99,6 @@ dependencies:
   device_info_plus: ^13.2.0
   marquee: ^2.2.3
   d4rt: ^0.2.4
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
   flutter_discord_rpc_fork:
     git:
       url: https://github.com/kodjodevf/flutter-discord-rpc.git

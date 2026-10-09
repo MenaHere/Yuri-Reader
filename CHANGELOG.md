@@ -4,6 +4,9 @@
 
 ### [2026-10-07]
 
+#### Bot
+- [2026-10-09] Synced 26 commits from [mangayomi](https://github.com/kodjodevf/mangayomi), 29 commits from [malsync](https://github.com/MALSync/MALSync)
+
 #### Fixed
 - The upstream sync no longer renames a pending `## Unreleased` section into a
   release; it records the sync under `## Unreleased` and releases only when the
