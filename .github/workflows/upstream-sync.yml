@@ -142,11 +142,11 @@ jobs:
           DATE="$(date -u +%Y-%m-%d)"
           BULLET="- Synced ${{ steps.check.outputs.manga_count }} commits from [mangayomi](https://github.com/kodjodevf/mangayomi), ${{ steps.check.outputs.mal_count }} commits from [malsync](https://github.com/MALSync/MALSync)"
           if [ "$(sed -n '3p' CHANGELOG.md)" = "## Unreleased" ]; then
-            # Pending release: record the sync under it, do not bump or release.
-            # A fresh `#### Bot` goes right after the section's `### [date]`
-            # line, above whatever is already there (newest on top).
-            awk -v b="$BULLET" '
-              !ins && /^### \[/ { print; print ""; print "#### Bot"; print b; ins=1; next }
+            # Pending release: record the sync under it as a new dated section,
+            # do not bump or release. The date is its own `### [date]` heading,
+            # above the existing ones (newest on top); the bullet carries none.
+            awk -v d="$DATE" -v b="$BULLET" '
+              NR==3 { print; print ""; print "### [" d "]"; print ""; print "#### Bot"; print b; next }
               { print }
             ' CHANGELOG.md > CHANGELOG.md.new && mv CHANGELOG.md.new CHANGELOG.md
             echo "released=false" >> "$GITHUB_OUTPUT"
@@ -175,11 +175,11 @@ jobs:
         if: failure() && steps.check.outputs.real == 'true'
         run: |
           DATE="$(date -u +%Y-%m-%d)"
-          BULLET="- [$DATE] Synced ${{ steps.check.outputs.manga_count }} commits from [mangayomi](https://github.com/kodjodevf/mangayomi), ${{ steps.check.outputs.mal_count }} commits from [malsync](https://github.com/MALSync/MALSync)"
+          BULLET="- Synced ${{ steps.check.outputs.manga_count }} commits from [mangayomi](https://github.com/kodjodevf/mangayomi), ${{ steps.check.outputs.mal_count }} commits from [malsync](https://github.com/MALSync/MALSync)"
           if [ "$(sed -n '3p' CHANGELOG.md)" = "## Unreleased" ]; then
-            # Already pending: record this sync under it, newest on top.
-            awk -v b="$BULLET" '
-              !ins && /^### \[/ { print; print ""; print "#### Bot"; print b; ins=1; next }
+            # Already pending: record this sync as a new dated section under it.
+            awk -v d="$DATE" -v b="$BULLET" '
+              NR==3 { print; print ""; print "### [" d "]"; print ""; print "#### Bot"; print b; next }
               { print }
             ' CHANGELOG.md > CHANGELOG.md.new && mv CHANGELOG.md.new CHANGELOG.md
           else

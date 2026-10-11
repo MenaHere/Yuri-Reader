@@ -2,16 +2,18 @@
 
 ## Unreleased
 
-### [2026-10-07]
+### [2026-10-09]
 
 #### Bot
-- [2026-10-09] Synced 26 commits from [mangayomi](https://github.com/kodjodevf/mangayomi), 29 commits from [malsync](https://github.com/MALSync/MALSync)
+- Synced 26 commits from [mangayomi](https://github.com/kodjodevf/mangayomi), 29 commits from [malsync](https://github.com/MALSync/MALSync)
+
+### [2026-10-07]
 
 #### Fixed
 - The upstream sync no longer renames a pending `## Unreleased` section into a
   release; it records the sync under `## Unreleased` and releases only when the
-  newest section is already a version. It also no longer drops its sync line
-  into an old release
+  newest section is already a version. Each sync is its own dated `### [date]`
+  section, and its sync line no longer lands in an old release
 
 ## Version 0.7.3+1
 
@@ -292,7 +294,7 @@
 ### [2026-09-26]
 
 #### Bot
-- [2026-09-26] Synced 13 commits from [mangayomi](https://github.com/kodjodevf/mangayomi), 32 commits from [malsync](https://github.com/MALSync/MALSync)
+- Synced 13 commits from [mangayomi](https://github.com/kodjodevf/mangayomi), 32 commits from [malsync](https://github.com/MALSync/MALSync)
 
 #### Fixed
 - The reader follows upstream's new page-loaded callback. The sync added a required one to the page content widget, which this fork's copy of the reader did not pass, so the synced tree did not build - neither the bot's own run nor 0.5.7 could finish. This fork's reader now answers it, making its remembered-page jump only once that page's image has loaded
