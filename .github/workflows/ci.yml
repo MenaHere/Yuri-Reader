@@ -14,6 +14,7 @@ on:
       - 'CHANGELOG.md'
       - 'README.md'
       - '.package/README.md'
+      - 'DESIGN.md'
 
 permissions:
   contents: read
