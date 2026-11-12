@@ -8,7 +8,7 @@ import 'package:yuri_reader/main.dart';
 import 'package:yuri_reader/models/chapter.dart';
 import 'package:yuri_reader/models/download.dart';
 import 'package:yuri_reader/models/manga.dart';
-import 'package:yuri_reader/models/track.dart';
+import 'package:yuri_reader/models/track.dart' hide TrackerProviders;
 import 'package:yuri_reader/models/track_preference.dart';
 import 'package:yuri_reader/modules/manga/detail/providers/track_state_providers.dart';
 import 'package:yuri_reader/modules/manga/reader/providers/push_router.dart';

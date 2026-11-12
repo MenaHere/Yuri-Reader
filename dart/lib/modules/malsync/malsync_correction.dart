@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:isar_community/isar.dart';
 import 'package:yuri_reader/main.dart';
 import 'package:yuri_reader/models/manga.dart';
-import 'package:yuri_reader/models/track.dart';
+// The fork's own TrackerProviders (tracker_library_screen.dart) names the
+// bridge at syncId 6 "MAL-Sync"; upstream's copy of the enum in models/track.dart
+// calls the same slot "local", so it is hidden here.
+import 'package:yuri_reader/models/track.dart' hide TrackerProviders;
 import 'package:yuri_reader/modules/malsync/malsync_style.dart';
 import 'package:yuri_reader/modules/tracker_library/tracker_library_screen.dart';
 import 'package:yuri_reader/services/yuri_sync/yuri_sync_service.dart';

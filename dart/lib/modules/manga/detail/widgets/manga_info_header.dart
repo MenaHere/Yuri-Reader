@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:yuri_reader/eval/model/m_bridge.dart';
 import 'package:yuri_reader/models/manga.dart';
-import 'package:yuri_reader/models/track.dart';
+import 'package:yuri_reader/models/track.dart' hide TrackerProviders;
 import 'package:yuri_reader/models/track_preference.dart';
 import 'package:yuri_reader/modules/library/library_screen.dart';
 import 'package:yuri_reader/modules/library/providers/local_archive.dart';
