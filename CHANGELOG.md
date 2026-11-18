@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### [2026-11-18]
+
+#### Bot
+- Synced 8 commits from [mangayomi](https://github.com/kodjodevf/mangayomi), 41 commits from [malsync](https://github.com/MALSync/MALSync)
+
 ### [2026-11-16]
 
 #### Bot
