@@ -92,7 +92,7 @@ jobs:
 
       - name: Sync dependency manifests
         if: steps.check.outputs.real == 'true'
-        run: ./.scripts/sync-deps.sh
+        run: ./.scripts/build/sync-deps.sh
 
       - name: Install Flutter
         if: steps.check.outputs.changed == 'true'
@@ -103,7 +103,7 @@ jobs:
 
       - name: Compose
         if: steps.check.outputs.changed == 'true'
-        run: ./.scripts/compose.sh
+        run: ./.scripts/build/compose.sh
 
       - name: Flutter pub get
         if: steps.check.outputs.changed == 'true'

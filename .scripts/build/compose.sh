@@ -15,7 +15,7 @@
 # Env:   SRC=<upstream tree>    (default: <repo>/dart/vendor/mangayomi)
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SRC="${SRC:-$ROOT/dart/vendor/mangayomi}"
 OUT="${1:-$ROOT/.build/app}"
 
@@ -34,7 +34,6 @@ cp -a "$SRC/." "$OUT/"
 # rust lib name everywhere, but KEPT runtime strings in Dart code
 # (user-data paths, URL schemes, display text, github URLs).
 find "$OUT" -name "*.dart" \
-  ! -path "$OUT/lib/l10n/*" \
   ! -path "$OUT/lib/src/rust/frb_generated.io.dart" \
   -print0 | xargs -0 sed -i \
     -e 's/package:mangayomi/package:yuri_reader/g' \
@@ -79,6 +78,26 @@ mv "$OUT/rust_builder/macos/rust_lib_mangayomi.podspec" \
 # --- bridge custom files ---------------------------------------------------
 rsync -a --exclude vendor "$ROOT/dart/." "$OUT/"
 
+# --- the sync package's name ----------------------------------------------
+# Runs after the overlay, because the root pubspec comes from dart/ and keys
+# the path dependency by name. Upstream's packages/mangayomi_sync is imported
+# as package:yuri_reader_sync (pass 1 turns package:mangayomi into
+# package:yuri_reader) while pass 2's yaml rename writes yurireader_sync, so
+# the package name is pointed back at the imports. All three must agree or
+# `flutter pub get` refuses the tree.
+SYNC_PKG="$OUT/packages/mangayomi_sync/pubspec.yaml"
+if [ -f "$SYNC_PKG" ]; then
+  sed -i 's/^name: yurireader_sync$/name: yuri_reader_sync/' "$SYNC_PKG"
+  if ! grep -q '^name: yuri_reader_sync$' "$SYNC_PKG"; then
+    echo "error: packages/mangayomi_sync no longer declares the name this expects" >&2
+    exit 1
+  fi
+  if ! grep -q '^  yuri_reader_sync:$' "$OUT/pubspec.yaml"; then
+    echo "error: the root pubspec does not key the sync package as yuri_reader_sync" >&2
+    exit 1
+  fi
+fi
+
 # --- extension compatibility version ---------------------------------------
 # Mangayomi's extension index states the app version each extension needs
 # (appMinVerReq, currently 0.5.0) and fetch_sources_list.dart compares that with
@@ -108,7 +127,7 @@ sed -i \
   echo "/// The mangayomi version this tree is built from. The extension index"
   echo "/// states the app version each extension needs, and the fork numbers"
   echo "/// itself on its own scale, which the index knows nothing about, so the"
-  echo "/// compatibility check reads this instead. Set by .scripts/compose.sh."
+  echo "/// compatibility check reads this instead. Set by .scripts/build/compose.sh."
   echo "const _mangayomiBaseVersion = '$BASE_VERSION';"
 } >> "$COMPAT_FILE"
 if ! grep -q "^const _mangayomiBaseVersion = '$BASE_VERSION';\$" "$COMPAT_FILE" \

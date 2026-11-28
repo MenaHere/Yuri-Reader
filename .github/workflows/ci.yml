@@ -45,7 +45,7 @@ jobs:
           cache: true
 
       - name: Compose
-        run: ./.scripts/compose.sh
+        run: ./.scripts/build/compose.sh
 
       - name: Flutter pub get
         working-directory: .build/app

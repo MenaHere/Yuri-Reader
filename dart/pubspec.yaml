@@ -22,7 +22,7 @@ dependencies:
   material_ui: ^1.11.0
   shiori:
     path: packages/shiori
-  mangayomi_sync:
+  yuri_reader_sync:
     path: packages/mangayomi_sync
   remote_webview_interceptor:
     path: packages/remote_webview_interceptor

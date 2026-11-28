@@ -170,7 +170,7 @@ jobs:
           cache: true
 
       - name: Compose
-        run: ./.scripts/compose.sh
+        run: ./.scripts/build/compose.sh
 
       - name: Resolve the Flatpak runtime's libraries
         run: |
@@ -191,7 +191,7 @@ jobs:
           echo "FLATPAK_RUNTIME_LIBS=$RUNNER_TEMP/runtime-sonames.txt" >> "$GITHUB_ENV"
 
       - name: Build Linux
-        run: ./.scripts/build.sh linux
+        run: ./build.sh linux --release
 
       - name: Package Linux bundle
         run: |
@@ -252,7 +252,7 @@ jobs:
           java-version: '17'
 
       - name: Compose
-        run: ./.scripts/compose.sh
+        run: ./.scripts/build/compose.sh
 
       - name: Build the signed APK
         env:
@@ -260,7 +260,7 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./.scripts/build.sh android
+        run: ./build.sh android --release
 
       - name: Rename the APK
         run: |
