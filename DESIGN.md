@@ -9,8 +9,9 @@ dart/                    my dart bridge + its upstream
 ts/                      my ts bridge + its upstream
   vendor/malsync/        pinned upstream submodule
   src/, package.json...  my ts code (the Yuri-Sync service)
-.scripts/compose.sh      mangayomi + renames + dart/ -> .build/app
-.scripts/build.sh        compose + yuri-sync binary + flutter build
+.scripts/build/compose.sh      mangayomi + renames + dart/ -> .build/app
+.scripts/build/sync-deps.sh    pulls upstream dependency manifests
+build.sh                       compose + yuri-sync binary + flutter build
 .github/workflows/upstream-sync.yml   sync bot
 ...
 ```
@@ -57,7 +58,7 @@ ts/                      my ts bridge + its upstream
   re-pack never waits on the ~30-minute Android build. Nothing calls it
   automatically.
 - **`upstream-sync.yml`** (the bot) only syncs: bump submodules -> sync
-  dependency manifests (`.scripts/sync-deps.sh` copies mangayomi's pubspec.yaml
+  dependency manifests (`.scripts/build/sync-deps.sh` copies mangayomi's pubspec.yaml
   and re-applies the 6 fork substitutions: name, version, rust_lib name,
   yuri-sync asset, app name, repo URLs) -> `flutter analyze` as the green/red
   gate -> changelog -> commit `BotYYYYMMDDnnn` -> push -> then calls

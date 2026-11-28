@@ -9,17 +9,16 @@ with [MALSync](https://github.com/MALSync/MALSync)-based tracking.
 - Tracker support:
   - MAL-Sync: MyAnimeList, AniList, SIMKL, Trakt, Kitsu
 - [Flatpak](.package/README.md)
-## Quick Start
 
+## Quick Start
 ```bash
 git clone --recursive https://github.com/MenaHere/Yuri-Reader.git
 cd Yuri-Reader
-./.scripts/build.sh linux      # or: windows, macos
+./build.sh                  # host platform, debug
+./build.sh android          # another platform
+./build.sh linux --release  # explicit release
 ```
 
 ## License
 
-Licensed per component, not dual-licensed: each part carries exactly one
-license. The app is **Apache-2.0** (`LICENSE-APACHE`); the sync service is
-**GPL-3.0** (`LICENSE-GPL-3.0`). The two are separate programs that communicate
-only over localhost sockets.
+You may distribute the whole app in [GPL-v3](LICENSE-GPL-3.0), or only the (dart/flutter)[./dart/] part in [Apache-2.0](LICENSE-APACHE) License.

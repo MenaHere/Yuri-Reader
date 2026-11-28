@@ -12,7 +12,9 @@
 
 ## Build
 ```bash
-./.scripts/build.sh linux      # or: windows, macos, android, etc
+./build.sh                     # host platform, debug
+./build.sh android             # another platform
+./build.sh linux --release     # explicit release
 ```
 - **Do not build a release locally.** It takes too long. For dev testing, use debug build mode.
 
@@ -66,6 +68,6 @@ item that names the upstream commits it synced.
 
 ## Before pushing
 `dart analyze` on the composed tree is the fast gate:
-`./.scripts/compose.sh && cd .build/app && flutter pub get && dart analyze`.
+`./.scripts/build/compose.sh && cd .build/app && flutter pub get && dart analyze`.
 `flutter clean` - it throws away the Rust build cache. Avoid it to reduce build time.
 Changes with `./AGENTS.md`,`./README.md` or must not be pushed without human approval.
